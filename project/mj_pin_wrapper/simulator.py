@@ -117,7 +117,6 @@ class Simulator(object):
             if self.verbose: print("/!\ Controller diverged")
             return True
         
-        #self.data_recorder.save_data()
         return False
         
     def run(self,
@@ -189,7 +188,6 @@ class Simulator(object):
             sum_step_time = sum(self.simulation_it_time)
             mean_step_time = sum_step_time / len(self.simulation_it_time)
             total_sim_time = time.time() - sim_start_time
-            self.data_recorder.save_data()
             print(f"--- Total optimization step time: {sum_step_time:.2f} s")
             print(f"--- Mean simulation step time: {mean_step_time*1000:.2f} ms")
             print(f"--- Total simulation time: {total_sim_time:.2f} s")

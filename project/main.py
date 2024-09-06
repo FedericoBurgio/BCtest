@@ -5,7 +5,7 @@ from typing import Any, Dict
 #import tensorflow as tf
 import torch
 import pickle
-
+import time
 
 from mj_pin_wrapper.abstract.robot import AbstractRobotWrapper
 
@@ -42,6 +42,27 @@ class PolicyNetwork(nn.Module):
         action_logits = self.fc3(x)
         return action_logits
 
+class NoController(ControllerAbstract):
+    def __init__(self,
+                 robot: AbstractRobotWrapper,
+                 **kwargs
+                 ) -> None:
+        super().__init__(robot, **kwargs)
+    
+    def get_torques(self,
+                   q: np.array,
+                   v: np.array,
+                   robot_data: Any,
+                   **kwargs
+                   ):
+        keys = ['FL_hip', 'FR_hip', 'RL_hip', 'RR_hip',
+         'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh',
+        'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf']
+        torques = {}
+        for key in keys:
+            torques[key] = 0.0   
+        return torques
+
 class TrainedController(ControllerAbstract):
 
     def __init__(self,
@@ -57,7 +78,7 @@ class TrainedController(ControllerAbstract):
         self.policy = PolicyNetwork(35, 12).to(device)
         
         # Load the trained model
-        self.policy.load_state_dict(torch.load("/home/atari_ws/project/policy_model.pth"))
+        self.policy.load_state_dict(torch.load("/home/atari_ws/project/policy_model22.pth"))
         self.policy.eval()  # Set the model to evaluation mode
     
     def get_torques(self,
@@ -88,7 +109,6 @@ class TrainedController(ControllerAbstract):
         
         return torques
     
-
 class DataRecorderBC(object):
     def __init__(self,
                  record_dir:str="/home/federico") -> None:
@@ -184,60 +204,163 @@ class DataRecorderBC3(object):
         
     def record(self, q: np.array, v: np.array, tau: np.array, robot_data: Any, **kwargs) -> None:
         # Combine state (q and v) and action (tau)
+        
         s = np.concatenate((q[2:], v))  # Create a state from q and v components
         a = np.array(list(tau.values()))    # Convert action (tau) to numpy array
-
-        self.s_list.append(s)
-        self.a_list.append(a)
-
+        if not np.isnan(a).any():
+            self.s_list.append(s)
+            self.a_list.append(a)
         #print(f"State shape: {s.shape}, Action shape: {a.shape}")
+        
 
     def save_data(self, filename: str = 'DatasetBC.npz') -> None:
+        # Convert lists to arrays for efficient storage
+        new_states = np.array(self.s_list)
+        new_actions = np.array(self.a_list)
+        
+
+        # Check if the file already exists
+        if os.path.exists(filename):
+            # Load existing data
+            existing_data = np.load(filename)
+            existing_states = existing_data['states']
+            existing_actions = existing_data['actions']
+
+            # Append new data to existing data
+            combined_states = np.concatenate((existing_states, new_states), axis=0)
+            combined_actions = np.concatenate((existing_actions, new_actions), axis=0)
+        else:
+            # If file does not exist, just use new data
+            combined_states = new_states
+            combined_actions = new_actions
+
+        # Save the combined data back to the file
+        np.savez(filename, states=combined_states, actions=combined_actions)
+
+    def save_dataOLD(self, filename: str = 'DatasetBC_old.npz') -> None:
         # Convert lists to arrays for efficient storage
         states = np.array(self.s_list)
         actions = np.array(self.a_list)
         
-        # Save data as a compressed NumPy file
         np.savez_compressed(os.path.join(self.record_dir, filename), states=states, actions=actions)
         
         print(f"Data saved to {filename}")
+    
+    # def save_data(self, filename: str = 'DatasetBC.npz') -> None:
+    #     # Convert lists to arrays for efficient storage
+    #     states = np.array(self.s_list)
+    #     actions = np.array(self.a_list)
+        
+    #     # Save data as a compressed NumPy file
+    #     np.savez_compressed(os.path.join(self.record_dir, filename), states=states, actions=actions)
+        
+    #     print(f"Data saved to {filename}")
               
 if __name__ == "__main__":
-    
-    ###### Robot model
-    cfg = Go2Config
-    robot = MJPinQuadRobotWrapper(
-        *RobotModelLoader.get_paths(cfg.name, mesh_dir=cfg.mesh_dir),
-        rotor_inertia=cfg.rotor_inertia,
-        gear_ratio=cfg.gear_ratio,
-        )
-    robot.pin.info()
-    robot.mj.info()
-    
-    useMPC=False
-    if useMPC: 
-        ###### Controller
-        controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+    import random
+    if False:
+        ###### Robot model
+        cfg = Go2Config
+        robot = MJPinQuadRobotWrapper(
+            *RobotModelLoader.get_paths(cfg.name, mesh_dir=cfg.mesh_dir),
+            rotor_inertia=cfg.rotor_inertia,
+            gear_ratio=cfg.gear_ratio,
+            )
+           
+        useMPC=False
+        if useMPC: 
+            ###### Controller
+            controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+            
+            # Set command
+            v_des, w_des = np.array([0.3, 0., 0.]), 0
+            controller.set_command(v_des, w_des)
+            # Set gait
+            controller.set_gait_params(trot)  # Choose between trot, jump and bound
+            simulator = Simulator(robot.mj, controller, DataRecorderBC3())
+        else:
+            controller = TrainedController(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+            simulator = Simulator(robot.mj, controller)
         
-        # Set command
-        v_des, w_des = np.array([0.3, 0., 0.]), 0
-        controller.set_command(v_des, w_des)
-        # Set gait
-        controller.set_gait_params(trot)  # Choose between trot, jump and bound
-        simulator = Simulator(robot.mj, controller, DataRecorderBC3())
-    else:
-        controller = TrainedController(robot.pin, replanning_time=0.05, sim_opt_lag=False)
-        simulator = Simulator(robot.mj, controller)
-        
     
+    #controller = NoController(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+    #simulator = Simulator(robot.mj, controller)
     # Visualize contact locations
     # visual_callback = (lambda viewer, step, q, v, data :
     #     desired_contact_locations_callback(viewer, step, q, v, data, controller))
     # Run simulation
-    sim_time = 10 #s
-    simulator.run(
-        simulation_time=sim_time,
-        viewer=True,
-        real_time=False,
-        visual_callback_fn=None,
-    )
+    
+        sim_time = 1.2#s
+        simulator.run(
+            simulation_time=sim_time,
+            viewer=True,
+            real_time=False,
+            visual_callback_fn=None,
+        )
+        if not simulator.controller.diverged:
+            simulator.data_recorder.save_data()    
+    
+    
+    
+    for i in range(15):
+        print(i)
+        ###### Robot model
+        cfg = Go2Config
+        robot = MJPinQuadRobotWrapper(
+            *RobotModelLoader.get_paths(cfg.name, mesh_dir=cfg.mesh_dir),
+            rotor_inertia=cfg.rotor_inertia,
+            gear_ratio=cfg.gear_ratio,
+            )
+        #print(robot.get_state())
+        print(robot.get_state()[0])
+        print(robot.get_state()[1])
+        std_deviation = 0.05 # You can adjust this value to control the amount of randomness
+
+        print(444)
+        # Add Gaussian noise to the vector
+        q = robot.get_state()[0] + np.random.normal(0, std_deviation, size=19)
+        v = robot.get_state()[1] + np.random.normal(0, std_deviation, size=18)
+        q[0]=0
+        q[1]=0
+        q[2]=0.27
+        robot.reset(q,v)
+        robot.pin.info()
+        robot.mj.info()
+        
+        useMPC=0
+        if useMPC: 
+            ###### Controller
+            controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+            
+            # Set command
+            v_des, w_des = np.array([0.3, 0., 0.]), 0
+            controller.set_command(v_des, w_des)
+            # Set gait
+            controller.set_gait_params(trot)  # Choose between trot, jump and bound
+            simulator = Simulator(robot.mj, controller, DataRecorderBC3())
+        else:
+            controller = TrainedController(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+            simulator = Simulator(robot.mj, controller)
+        
+    #controller = NoController(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+    #simulator = Simulator(robot.mj, controller)
+    # Visualize contact locations
+    # visual_callback = (lambda viewer, step, q, v, data :
+    #     desired_contact_locations_callback(viewer, step, q, v, data, controller))
+    # Run simulation
+    
+        sim_time = 1.1#s
+        simulator.run(
+            simulation_time=sim_time,
+            viewer=True,
+            real_time=False,
+            visual_callback_fn=None,
+        )
+        
+    
+        if useMPC and not simulator.controller.diverged:
+            simulator.data_recorder.save_data("dataset20.npz")
+        else:
+            print("Diverged")
+            i = i - 1
+        

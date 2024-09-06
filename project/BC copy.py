@@ -12,7 +12,7 @@ lossHistory = []
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 #data = np.load("/home/atari_ws/project/DatasetBC.npz")
-data = np.load("DatasetBC.npz")
+data = np.load("dataset20.npz")
 
 
 # Extract states and actions
@@ -21,6 +21,12 @@ actions = data['actions']
 
 state_size = states.shape[1]  
 action_size = actions.shape[1]  
+
+valid_mask = ~np.isnan(actions).any(axis=1) & ~np.isnan(states).any(axis=1)
+
+# Filter out states and actions with NaN values
+states = states[valid_mask]
+actions = actions[valid_mask]
 
 # Convert to PyTorch tensors for training
 states = torch.tensor(states, dtype=torch.float32).to(device)
@@ -53,9 +59,9 @@ model = PolicyNetwork(state_size, action_size).to(device)
 
 # Loss function and optimizer
 criterion = nn.MSELoss()  # Use CrossEntropyLoss for discrete actions
-optimizer = optim.Adam(model.parameters(), lr=0.0005)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-num_epochs = 10000
+num_epochs = 1000
 
 
 for epoch in range(num_epochs):
@@ -77,7 +83,7 @@ for epoch in range(num_epochs):
 
 np.save("lossHistory.npy", lossHistory)
 # Save the trained model
-model_path = "policy_model.pth"
+model_path = "policy_model22.pth"
 torch.save(model.state_dict(), model_path)
 print(f"Model saved to {model_path}")
 
