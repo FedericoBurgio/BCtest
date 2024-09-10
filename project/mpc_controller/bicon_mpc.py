@@ -194,6 +194,7 @@ class BiConMPC(ControllerAbstract):
                     v: np.ndarray,
                     robot_data: Any
                     ) -> dict[float]:
+        #aaaaaaaaaaaaaaaaaaaa
         """
         Returns torques from simulation data.
 

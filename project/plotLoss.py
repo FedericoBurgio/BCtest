@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 # Load the loss history data
 loss_history = np.load('lossHistory.npy')
-
+#loss_history = np.convolve(loss_history, np.ones(100) / 100, mode='valid')
 # Plot the loss history on a log scale
 
 plt.plot(loss_history, label='Loss')

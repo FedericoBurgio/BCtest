@@ -44,10 +44,6 @@ class MJPinQuadRobotWrapper(object):
         self.collided = False # True if robot is in collision
         
         self._check_models()
-        # q=[]
-        # for i in range(19):
-        #     q.append(i/10)    
-        # self.reset(np.array(q))
         self.reset()
         
     def _check_models(self) -> None:
