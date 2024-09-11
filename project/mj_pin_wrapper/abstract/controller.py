@@ -3,7 +3,6 @@
 
 from typing import Any
 import numpy as np
-import tensorflow as tf
 
 from mj_pin_wrapper.abstract.robot import AbstractRobotWrapper
 

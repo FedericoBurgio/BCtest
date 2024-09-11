@@ -11,7 +11,7 @@ actions_t = data['actions']
 
 state_mean = np.mean(states, axis=0)
 state_std = np.std(states, axis=0)
-#states = (states - state_mean) / (state_std + 1e-6)
+states = (states - state_mean) / (state_std + 1e-6)
 
 
 # Remove NaN values
@@ -152,9 +152,9 @@ try:
 
 except KeyboardInterrupt:
     print("Training interrupted. Saving the best model...")
-
+if epoch >9:
 # Save the final best model
-model_path = "phase/best_policy_final.pth"
-torch.save(best_policy, model_path)
-print(f"Final best model saved to {model_path}")
-np.save("lossHistory.npy", train_losses)
+    model_path = "phase/best_policy_final.pth"
+    torch.save(best_policy, model_path)
+    print(f"Final best model saved to {model_path}")
+    np.save("lossHistory.npy", train_losses)

@@ -5,11 +5,14 @@ from typing import Any, Callable
 import mujoco
 from mujoco import viewer
 import time
+import numpy as np
 
 from mj_pin_wrapper.mj_robot import MJQuadRobotWrapper
 from mj_pin_wrapper.abstract.controller import ControllerAbstract
 from mj_pin_wrapper.abstract.data_recorder import DataRecorderAbstract
 
+
+import numpy as np
 class Simulator(object):
     DEFAULT_SIM_DT = 1.0e-3 #s
     def __init__(self,
@@ -152,28 +155,44 @@ class Simulator(object):
             print("-----> Simulation start")
         
         self.sim_step = 0
-        
+        self.robot.xfrc_applied = []
         # With viewer
+        for i in range(14):
+            print('name of geom ', i, ': ', self.robot.model.body(i).name)
+            
         if use_viewer:
             with mujoco.viewer.launch_passive(self.robot.model, self.robot.data) as viewer:
-                
-                  # Enable wireframe rendering of the entire scene.
+                            
+                            # Enable wireframe rendering of the entire scene.
                 viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
                 viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_FOG] = 0
                 viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
                 
                 viewer.sync()
                 sim_start_time = time.time()
+                
                 while (viewer.is_running() and
-                       (simulation_time < 0. or
-                        self.sim_step * self.sim_dt < simulation_time)
-                       ):
+                    (simulation_time < 0. or
+                        self.sim_step * self.sim_dt < simulation_time)):
+                    # if self.sim_step % 600 == 0:
+                    #     self.robot.data.xfrc_applied[np.random.randint(14)] = np.random.uniform(-600, 400, 6)
+                    #     self.robot.data.xfrc_applied[np.random.randint(14)] = np.random.uniform(-400, 600, 6)
+                    #     self.robot.data.xfrc_applied[1] = np.random.uniform(-200, 200, 6)
+                    
+                    #self.robot.data.xfrc_applied[14] = np.random.uniform(-60, 60, 6)
+                    
                     self._simulation_step_with_timings(real_time)
                     self.update_visuals(viewer)
                     viewer.sync()
+
                     
+                    
+                    viewer.sync()
+
                     if self._stop_sim():
                         break
+
+
 
         # No viewer
         else:

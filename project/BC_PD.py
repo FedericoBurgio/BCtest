@@ -3,47 +3,31 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
+from datetime import datetime
+import os
+
+
+# Get the current date and time
+now = datetime.now()
+date_time_str = now.strftime("%d%H%M")  # Format as DAY-HOUR-MINUTE
+
+# Create the directory if it doesn't exist
+save_dir = f"{date_time_str}"
+os.makedirs(save_dir, exist_ok=True)  # This will create the directory if it doesn't already exist
 
 # Load dataset
-data = np.load("DatasetPD.npz")
+data = np.load("DatasetPD2.npz")
 states = data['states']
 qNext = data['qNext']
 
 state_mean = np.mean(states, axis=0)
 state_std = np.std(states, axis=0)
-#states = (states - state_mean) / (state_std + 1e-6)
-
 
 # Remove NaN values
 valid_mask = ~np.isnan(qNext).any(axis=1) & ~np.isnan(states).any(axis=1)
 states = states[valid_mask]
 qNext = qNext[valid_mask]
 
-# q=np.zeros((len(states),12))
-# v=np.zeros((len(states),12))
-# for i in range(len(states)):
-#     q[i]=states[i][5:17]
-#     v[i]=states[i][23:35]
-# print(q.shape)
-# print(v.shape)
-# print(actions_t.shape)
-# print(states.shape)
-# print(q[7])
-# print(states[7][5:17])
-# print(q[7]==states[7][5:17])
-
-# kp=2
-# kv=.1
-# actions = np.zeros((len(states),12))
-# for i in range(len(states)):
-#     for j in range(12):
-#         actions[i][j] = q[i][j] + (actions_t[i][j] + kv*v[i][j])/kp
-# #actions = q + (actions_t + kv*v)/kp 
-# lossH=[]
-# print(333)
-# print(actions.shape)
-# np.save("actions.npy",actions)
-# ddd
 # Convert to PyTorch tensors and move to the appropriate device (CPU or GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 states = torch.tensor(states, dtype=torch.float32).to(device)
@@ -58,25 +42,8 @@ train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size,
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
 
-#Define the Policy Network
+# Define the Policy Network
 class PolicyNetwork(nn.Module):
-    def __init__(self, state_size, action_size):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 1024)
-        self.fc2 = nn.Linear(1024, 512)
-        self.fc3 = nn.Linear(512, 256)
-        self.fc4 = nn.Linear(256, action_size)
-        self.dropout = nn.Dropout(0.05)
-        self.relu = nn.ReLU()
-
-    def forward(self, state):
-        x = self.relu(self.fc1(state))
-        x = self.relu(self.fc2(x))
-        x = self.relu(self.fc3(x))
-        action_logits = self.fc4(x)
-        return action_logits
-    
-class PolicyNetwork2(nn.Module):
     def __init__(self, state_size, action_size):
         super(PolicyNetwork, self).__init__()
         self.fc1 = nn.Linear(state_size, 256)
@@ -143,18 +110,22 @@ try:
             best_policy = model.state_dict()
 
         print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {average_train_loss:.4e}, Val Loss: {average_val_loss:.4e}, Best Val Loss: {best_val_loss:.4e}')
-        
+
         # Save the best policy every 10 epochs
-        if epoch % 10 == 0 and epoch != 0:
-            model_path = f'phase/best_policy_ep{epoch}.pth'
+        if (epoch + 1) % 10 == 0:
+            model_path = f'{save_dir}/best_policy_ep{epoch+1}.pth'
             torch.save(best_policy, model_path)
-            print(f"Model saved to {model_path}")
+            print(f'Model saved to {model_path}')
 
 except KeyboardInterrupt:
     print("Training interrupted. Saving the best model...")
 
-# Save the final best model
-model_path = "phase/best_policy_final.pth"
+# Save the final best model with the dynamic file path
+model_path = f"{save_dir}/best_policy_final.pth"
 torch.save(best_policy, model_path)
 print(f"Final best model saved to {model_path}")
-np.save("lossHistory.npy", train_losses)
+
+# Save loss history as numpy arrays
+np.save(f"{save_dir}/train_losses.npy", np.array(train_losses))
+np.save(f"{save_dir}/val_losses.npy", np.array(val_losses))
+print(f"Loss history saved to {save_dir}/train_losses.npy and val_losses.npy")
