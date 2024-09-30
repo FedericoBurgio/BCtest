@@ -18,7 +18,6 @@ from mpc_controller.motions.cyclic.go2_trot import trot
 from mpc_controller.motions.cyclic.go2_jump import jump
 from mpc_controller.motions.cyclic.go2_bound import bound
 from mpc_controller.bicon_mpc import BiConMPC
-#from BC_copy import PolicyNetwork
 
 
 from mj_pin_wrapper.abstract.controller import ControllerAbstract
@@ -31,44 +30,21 @@ from utils.config import Go2Config
 import torch
 import torch.nn as nn
 
-# Define the Policy Network
-class PolicyNetwork(nn.Module):
-    def __init__(self, state_size, action_size):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 256)
-        self.fc4 = nn.Linear(256, action_size)
-        self.dropout = nn.Dropout(0.05)
-        self.relu = nn.ReLU()
-
-    def forward(self, state):
-        x = self.relu(self.fc1(state))
-        x = self.relu(self.fc2(x))
-        x = self.relu(self.fc3(x))
-        action_logits = self.fc4(x)
-        return action_logits
-    
-
+import nets
 import Controllers
 import Recorders
- 
-if __name__ == "__main__":
-    
-    # Prompt the user to enter the mode number
-    mode = input("\nWhich mode do you want to use?\n0: recording\n1: testing trained\n2: MPC\n")
 
-    try:
-        # Convert input to an integer
-        mode = int(mode)
-    except ValueError:
-        print("Invalid input. Please enter a valid number.\n")
-        
-    
-    import random
-    
-    std_deviation = 0.0655# initial state randomness
-    
+def SimManager(mode = - 1):
+    # Prompt the user to enter the mode number
+    if mode == -1:
+        mode = input("\nWhich mode do you want to use?\n0: recording\n1: testing trained\n2: MPC\n")
+
+        try:
+            # Convert input to an integer
+            mode = int(mode)
+        except ValueError:
+            print("Invalid input. Please enter a valid number.\n")
+            
     cfg = Go2Config
     robot = MJPinQuadRobotWrapper(
             *RobotModelLoader.get_paths(cfg.name, mesh_dir=cfg.mesh_dir),
@@ -76,36 +52,71 @@ if __name__ == "__main__":
             gear_ratio=cfg.gear_ratio,
             )
     
-    if mode==0: #recording  
-    ##### Robot model
-        robot.pin.info()
-        robot.mj.info()
-        
-        ###### Controller
-        controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
-        
-        # Set command
-        v_des, w_des = np.array([0.3, 0., 0.]), 0
-        controller.set_command(v_des, w_des)
-        # Set gait
-        
-        controller.set_gait_params(trot)  # Choose between trot, jump and bound
-        #print(controller.gait_gen.gait_planner.get_phase(robot))
-        #simulator = Simulator(robot.mj, controller, DataRecorderBC3(phase=controller.gait_gen.gait_planner.get_phase(robot.mj.data.time,0))) 
-        simulator = Simulator(robot.mj, controller, Recorders.DataRecorderPD(controller)) 
-        
-        sim_time = 1#s
-        simulator.run(
-            simulation_time=sim_time,
-            use_viewer=False,
-            real_time=False,
-            visual_callback_fn=None,)
-        if not simulator.controller.diverged:
-            simulator.data_recorder.save_data("DatasetPD2TEST.npz")
+    gaits = [trot, jump]
+    if mode == 0:
+        success = 0
+        while success < 16:
+            controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
+            
+            # Set command
+            
+            # Select gait based on success, wrapping around using modulo
+            sel_gait = gaits[success % len(gaits)]
+            
+            v_des = np.zeros(3)
+            v_des[0] = np.random.uniform(-0.5, 0.5)
+            v_des[1] = np.random.uniform(-0.25, 0.25)
+            w_des = np.random.uniform(-0.055, 0.055)
+            
+            if sel_gait == jump: 
+                controller.set_command(v_des * 0.5, w_des * 0.4)
+            else:
+                controller.set_command(v_des, w_des)
+            
+            # Set gait parameters and create simulator
+            controller.set_gait_params(sel_gait)  # Choose between trot, jump, etc.
+            recorder = Recorders.DataRecorderPD(controller)
+            recorder.gait_index = gaits.index(sel_gait)
+            simulator = Simulator(robot.mj, controller, recorder)
+            
+            sim_time = 8  # seconds
+            simulator.run(
+                simulation_time=sim_time,
+                use_viewer=0,
+                real_time=False,
+                visual_callback_fn=None,
+                randomize=True)
+            
+            if not simulator.controller.diverged:
+                simulator.data_recorder.save_data("v_w_gaits-jump-trot.npz")
+                success += 1
+            
+            print("Successful:", success)
+
+            # Reinitialize robot
+            cfg = Go2Config
+            robot = MJPinQuadRobotWrapper(
+                *RobotModelLoader.get_paths(cfg.name, mesh_dir=cfg.mesh_dir),
+                rotor_inertia=cfg.rotor_inertia,
+                gear_ratio=cfg.gear_ratio,
+            )
             
     elif mode==1:
-
-        controller = Controllers.TrainedControllerPD(robot.pin, replanning_time=0.05, sim_opt_lag=False,datasetPath="/home/atari_ws/project/111227/best_policy_final.pth")
+        data = "291101"
+        ep = "ep250" #"ep120" 
+        #data = "251510"
+        #ep = "130" 
+        
+        path = "/home/atari_ws/project/models/" + data + "/best_policy_" + ep + ".pth"
+        controller = Controllers.TrainedControllerPD(robot.pin, replanning_time=0.05, sim_opt_lag=False,
+                                                     datasetPath = path)
+        
+        v_des, w_des = np.array([-0.2, -0.2, 0.]), 0.
+        controller.set_command(v_des, w_des)
+        # Set gait
+        sel_gait = trot
+        controller.set_gait_params(sel_gait)  # Choose between trot, jump and bound
+        controller.gait_index = gaits.index(sel_gait)
         simulator = Simulator(robot.mj, controller)
         
         # Visualize contact locations
@@ -113,12 +124,13 @@ if __name__ == "__main__":
         #     desired_contact_locations_callback(viewer, step, q, v, data, controller))
         # Run simulation
         
-        sim_time = 15#s
+        sim_time = 35#s
         simulator.run(
             simulation_time=sim_time,
             viewer=True,
             real_time=False,
             visual_callback_fn=None,
+            randomize=False
         )
         
     ###
@@ -130,7 +142,12 @@ if __name__ == "__main__":
         controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
         
         # Set command
-        v_des, w_des = np.array([0.3, 0., 0.]), 0
+        #v_des, w_des = np.array([0.3, 0., 0.]), 0
+        
+        v_des = np.zeros(3)
+        v_des[0] = np.random.uniform(-0.5, 0.5)
+        v_des[1] = np.random.uniform(-0.25, 0.25)
+        w_des = np.random.uniform(-0.055, 0.055)
         controller.set_command(v_des, w_des)
         # Set gait
         
@@ -142,8 +159,15 @@ if __name__ == "__main__":
             simulation_time=sim_time,
             use_viewer=True,
             real_time=False,
-            visual_callback_fn=None,)
+            visual_callback_fn=None,
+            randomize=True)
     ###
         
     elif mode == 999:
         5 
+    
+
+
+if __name__ == "__main__":
+    SimManager()
+    

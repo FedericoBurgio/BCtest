@@ -133,3 +133,5 @@ class MJPinQuadRobotWrapper(object):
             dict[str, int]: {foot name : geom in contact}
         """
         return self.mj.foot_contacts()
+    
+    

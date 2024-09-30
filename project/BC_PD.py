@@ -5,71 +5,56 @@ from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 from datetime import datetime
 import os
-
-
+import random
+from main import SimManager
 # Get the current date and time
 now = datetime.now()
 date_time_str = now.strftime("%d%H%M")  # Format as DAY-HOUR-MINUTE
 
 # Create the directory if it doesn't exist
-save_dir = f"{date_time_str}"
+save_dir = "models/" + f"{date_time_str}"
 os.makedirs(save_dir, exist_ok=True)  # This will create the directory if it doesn't already exist
 
 # Load dataset
-data = np.load("DatasetPD2.npz")
+data = np.load("v_w_gaits-jump-trot.npz")
 states = data['states']
 qNext = data['qNext']
-
-state_mean = np.mean(states, axis=0)
-state_std = np.std(states, axis=0)
 
 # Remove NaN values
 valid_mask = ~np.isnan(qNext).any(axis=1) & ~np.isnan(states).any(axis=1)
 states = states[valid_mask]
 qNext = qNext[valid_mask]
 
+step = 1
+states = states[::step]
+qNext = qNext[::step]
+
 # Convert to PyTorch tensors and move to the appropriate device (CPU or GPU)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 states = torch.tensor(states, dtype=torch.float32).to(device)
 actions = torch.tensor(qNext, dtype=torch.float32).to(device)
-
+#states = torch.nn.functional.normalize(states)
 # Create datasets and dataloaders
 dataset = TensorDataset(states, actions)
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
 train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=64, shuffle=False)
+batch_size = 128
+train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size, shuffle=False)
 
-# Define the Policy Network
-class PolicyNetwork(nn.Module):
-    def __init__(self, state_size, action_size):
-        super(PolicyNetwork, self).__init__()
-        self.fc1 = nn.Linear(state_size, 256)
-        self.fc2 = nn.Linear(256, 256)
-        self.fc3 = nn.Linear(256, 256)
-        self.fc4 = nn.Linear(256, action_size)
-        self.dropout = nn.Dropout(0.05)
-        self.relu = nn.ReLU()
+import nets
 
-    def forward(self, state):
-        x = self.relu(self.fc1(state))
-        x = self.relu(self.fc2(x))
-        x = self.relu(self.fc3(x))
-        action_logits = self.fc4(x)
-        return action_logits
-
-# Initialize model, loss function, and optimizer
 state_size = states.shape[1]
 action_size = actions.shape[1]
-model = PolicyNetwork(state_size, action_size).to(device)
+model = nets.PolicyNetwork(state_size, action_size).to(device)
 
 criterion = nn.MSELoss()  # MSE for continuous actions
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 # Training loop variables
-num_epochs = 1000
+num_epochs = 500 * step
 best_val_loss = float('inf')
 best_policy = None
 train_losses = []
@@ -83,6 +68,9 @@ try:
         total_train_loss = 0
         for batch_states, batch_actions in train_loader:
             optimizer.zero_grad()
+            
+            batch_states = batch_states + torch.normal(mean=0, std=0.01, size=batch_states.shape).to(device)
+
             predicted_train_actions = model(batch_states)
             train_loss = criterion(predicted_train_actions, batch_actions)
             train_loss.backward()
@@ -116,12 +104,13 @@ try:
             model_path = f'{save_dir}/best_policy_ep{epoch+1}.pth'
             torch.save(best_policy, model_path)
             print(f'Model saved to {model_path}')
+            #SimManager(1)
 
 except KeyboardInterrupt:
     print("Training interrupted. Saving the best model...")
 
 # Save the final best model with the dynamic file path
-model_path = f"{save_dir}/best_policy_final.pth"
+model_path = f"{save_dir}/best_policy_epfinal.pth"
 torch.save(best_policy, model_path)
 print(f"Final best model saved to {model_path}")
 

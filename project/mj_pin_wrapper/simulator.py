@@ -74,6 +74,7 @@ class Simulator(object):
                                   self.v,
                                   torques,
                                   self.robot.data)
+        
         # Apply torques
         self.robot.send_joint_torques(torques)
         # Sim step
@@ -128,6 +129,7 @@ class Simulator(object):
             visual_callback_fn: Callable = None,
             **kwargs,
             ) -> None:
+        randomize = kwargs.get("randomize", False)
         """
         Run simulation for <simulation_time> seconds with or without a viewer.
 
@@ -157,10 +159,18 @@ class Simulator(object):
         self.sim_step = 0
         self.robot.xfrc_applied = []
         # With viewer
-        for i in range(14):
-            print('name of geom ', i, ': ', self.robot.model.body(i).name)
-            
+        def randomForce(selfRobotData):
+            timing = [30, 120, 970]
+            f = [15, 255, 990]
+            if randomize:
+                for i in range(len(timing)):
+                    if self.sim_step % timing[i] == 0:
+                        selfRobotData.xfrc_applied[np.random.randint(14)] = np.random.uniform(-f[i], f[i], 6)
+
+        
         if use_viewer:
+            for i in range(14):
+                print('name of geom ', i, ': ', self.robot.model.body(i).name)    
             with mujoco.viewer.launch_passive(self.robot.model, self.robot.data) as viewer:
                             
                             # Enable wireframe rendering of the entire scene.
@@ -171,34 +181,31 @@ class Simulator(object):
                 viewer.sync()
                 sim_start_time = time.time()
                 
-                while (viewer.is_running() and
+                applied = False
+                while (viewer.is_running() and #reminder: la differenza in applicare la forza qua o dove non si usa il viewer è che self.robot.data.xfrc_applied qua resta con la forza (gneeralizzata) applicata un unico time step, mentre se la applico doe non c'è il viewer resta applicata ( per sempre(?))
                     (simulation_time < 0. or
                         self.sim_step * self.sim_dt < simulation_time)):
-                    # if self.sim_step % 600 == 0:
-                    #     self.robot.data.xfrc_applied[np.random.randint(14)] = np.random.uniform(-600, 400, 6)
-                    #     self.robot.data.xfrc_applied[np.random.randint(14)] = np.random.uniform(-400, 600, 6)
-                    #     self.robot.data.xfrc_applied[1] = np.random.uniform(-200, 200, 6)
                     
-                    #self.robot.data.xfrc_applied[14] = np.random.uniform(-60, 60, 6)
-                    
+                    randomForce(self.robot.data)
                     self._simulation_step_with_timings(real_time)
                     self.update_visuals(viewer)
                     viewer.sync()
 
-                    
-                    
-                    viewer.sync()
-
+                
                     if self._stop_sim():
                         break
-
-
-
+                    
         # No viewer
         else:
             sim_start_time = time.time()
             while (simulation_time < 0. or self.sim_step < simulation_time * (1 / self.sim_dt)):
+                if np.any(self.robot.data.xfrc_applied != 0):
+                    self.robot.data.xfrc_applied = np.zeros_like(self.robot.data.xfrc_applied)   
+                
+                randomForce(self.robot.data)
                 self._simulation_step_with_timings(real_time)
+                
+                
                 if self._stop_sim():
                     break
     
