@@ -5,10 +5,10 @@ import pinocchio
 
 class DataRecorderPD(object):
     def __init__(self, controller, record_dir = "") -> None:
-        self.record_dir = record_dir
+        self.record_dir = "datasets/" + record_dir
         self.controller_ = controller
         self.gait_index = -1
-        
+ 
         # Initialize as empty arrays instead of lists for more efficient storage
         self.s_list = []
         self.qNext_list = []
@@ -37,7 +37,7 @@ class DataRecorderPD(object):
         s = np.append(s, cnt_base)
         s = np.append(s, self.controller_.v_des)
         s = np.append(s, self.controller_.w_des)
-        s = np.append(s, self.gait_index)
+        #s = np.append(s, self.gait_index)
 
         #self.express_contact_plan_in_consistant_frame(q, self.controller_.gait_gen.cnt_plan, base_frame=False)
         #print(tmp)
@@ -57,12 +57,36 @@ class DataRecorderPD(object):
         if not np.isnan(a).any():
             self.s_list.append(s)
             self.qNext_list.append(a)
+    
+    def save_data__(self, filename) -> None:
+        # Convert lists to arrays for efficient storage
+        new_states = np.array(self.s_list)
+        new_actions = np.array(self.qNext_list)
+        
+        # Prepare the path to save the file
+        filename = "datasets/" + filename  
+
+        # Check if the file exists and open in append mode
+        if os.path.exists(filename):
+            with open(filename, 'ab') as f:
+                # Append new data
+                np.savez(f, states=new_states, qNext=new_actions)
+        else:
+            # If file does not exist, write new data
+            np.savez(filename, states=new_states, qNext=new_actions)
+
+        print(f"Data saved to {filename}")
+
+        # Clear the lists to free up memory
+        self.s_list.clear()
+        self.qNext_list.clear()
+
         
     def save_data(self, filename) -> None:
         # Convert lists to arrays for efficient storage
         new_states = np.array(self.s_list)
         new_actions = np.array(self.qNext_list)
-        
+        filename  = "datasets/" + filename  
         # Check if the file already exists
         if os.path.exists(filename):
             with np.load(filename) as existing_data:
@@ -82,6 +106,9 @@ class DataRecorderPD(object):
         # Save the combined data back to the file
         np.savez(filename, states=combined_states, qNext=combined_actions)
         print(f"Data saved to {filename}")
+    
+        self.s_list.clear()
+        self.qNext_list.clear()
 
     def detect_contact_sequences(self, horizon_data): # in the sequence t0:1 t1:1 0 0 0 t5:1 find the next 1 and store the state and the number of steps taken to get there
         output_list = []                              #i.e. what i understood from majid's explanation

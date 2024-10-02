@@ -46,18 +46,18 @@ class TrainedControllerPD(BiConMPC):
                  replanning_time=.05,
                  sim_opt_lag=False,
                  datasetPath="",
+                 state_size = -1, #35+2+20 cont phase
+                 action_size = -1,
+                 hL = [],
                  **kwargs
                  ) -> None:
         #super().__init__(robot, **kwargs)
         super().__init__(robot, replanning_time=replanning_time, sim_opt_lag=sim_opt_lag, **kwargs)
-        self.state_size = 56 #35+2+20 cont phase
-        self.action_size = 12
-        v_des, w_des = np.array([0.3, 0., 0.]), 0
-        #self.set_command(v_des, w_des)
-            # Set gait
-        #self.set_gait_params(trot)  # Choose between trot, jump and bound
         
-        # Initialize the policy network
+        self.state_size = state_size
+        self.action_size = action_size
+        self.hL = hL
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.policy = PolicyNetwork(self.state_size, self.action_size).to(device)
         self.gait_index = -1
@@ -67,63 +67,59 @@ class TrainedControllerPD(BiConMPC):
         self.policy.eval()  # Set the model to evaluation mode
     
     def get_torques(self,
-                   q: np.array,
-                   v: np.array,
-                   robot_data: Any,
-                   **kwargs
-                   ):
-        
-        super().get_torques(q,v,robot_data)
-        
+                q: np.array,
+                v: np.array,
+                robot_data: Any,
+                **kwargs
+                ):
+        super().get_torques(q, v, robot_data)
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         s = np.concatenate((q[2:], v))  # Example combination of state variables
-        #s = np.append(s, self.gait_gen.gait_planner.get_percent_in_phase(robot_data.time, 0))
-        #s = np.append(s, self.gait_gen.gait_planner.get_phase(robot_data.time, 0))
-        #s = np.append(s, np.zeros(20))
-        #s = np.append(s, self.detect_contact_steps(self.gait_gen.cnt_plan)) #NON CANCELLARE LINEA ANCHE SE COMMENTATA
+        
+        # Prepare contact information
         cnt_wrd = []
         tmp = self.detect_contact_steps(self.gait_gen.cnt_plan)
-        for i in range(4): #4 EE
-            #tmp[1+5*i:4+5*i] = self.express_contact_plan_in_consistant_frame(q, tmp[1+5*i:4+5*i], base_frame=True)
-            cnt_wrd.append((tmp)[1+ 5*i:4 +5*i])
-            #cnt_frame.append(tmp[4 + 5*i])
+        for i in range(4):  # 4 EE
+            cnt_wrd.append(tmp[1 + 5 * i:4 + 5 * i])
+        
         cnt_base = self.express_contact_plan_in_consistant_frame(q, np.array(cnt_wrd), base_frame=True)
-        #breakpoint()
         cnt_base_copy = cnt_base.copy()
+        
         for i in range(4):
-            cnt_base = np.insert(cnt_base, 3 + i*3+i, tmp[4 + 5*i]) # bho double check sti indici #nota ho fatto double ceck sembra tutto ok
+            cnt_base = np.insert(cnt_base, 3 + i * 3 + i, tmp[4 + 5 * i])  # Check indices
+        
+        # Concatenate all relevant state information
         s = np.append(s, cnt_base)
         s = np.append(s, self.v_des)
         s = np.append(s, self.w_des)
-        s = np.append(s, self.gait_index)
-        #from sklearn.preprocessing import StandardScaler  # Added for better normalization
-        # scaler = StandardScaler()
-        # s = scaler.fit_transform(s.reshape(1,-1))  # Improved normalization strategy
 
+        # Convert to tensor and reshape for RNN
         state_tensor = torch.tensor(s, dtype=torch.float32).to(device).unsqueeze(0)  # Add batch dimension
-        #state_tensor = torch.nn.functional.normalize(state_tensor) 
+        state_tensor = state_tensor.unsqueeze(1)  # Shape: [1, 1, input_size] for RNN
+
         with torch.no_grad():
             # Get action logits from the model
             q_ = self.policy(state_tensor).view(-1).tolist()
-    
-        kp=2
-        kv=.1
+
+        kp = 2
+        kv = 0.1
         action = np.zeros(len(q_))
-        for i in range(len(q_)):
-            action[i] = kp * ( q_[i] - q[i+7]) - kv*v[i+6]
-      
         
+        for i in range(len(q_)):
+            action[i] = kp * (q_[i] - q[i + 7]) - kv * v[i + 6]
+
         keys = ['FL_hip', 'FR_hip', 'RL_hip', 'RR_hip',
-         'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh',
-        'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf']
-         
+                'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh',
+                'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf']
+        
         torques = {}
         for i in range(12):
             torques[keys[i]] = action[i]
-        
-        #print(torques)
-        
+
         return torques
+
+
     
     def detect_contact_steps(self, horizon_data):#returns current pos if in contact, next pos if not in contact
                                             #ie what i understood from victor's explanation

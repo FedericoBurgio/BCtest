@@ -160,12 +160,19 @@ class Simulator(object):
         self.robot.xfrc_applied = []
         # With viewer
         def randomForce(selfRobotData):
-            timing = [30, 120, 970]
-            f = [15, 255, 990]
             if randomize:
+                
+                timing = np.array([20, 150, 900])
+                f=np.array([20, 400, 450])
+                if self.data_recorder.gait_index == 1: f=f*0.3
+                
                 for i in range(len(timing)):
                     if self.sim_step % timing[i] == 0:
-                        selfRobotData.xfrc_applied[np.random.randint(14)] = np.random.uniform(-f[i], f[i], 6)
+                        body_index = np.random.randint(14)
+                        if body_index == 1 and self.data_recorder.gait_index == 0:
+                            selfRobotData.xfrc_applied[body_index] = 2*np.random.uniform(-f[i], f[i], 6)
+                        else:
+                            selfRobotData.xfrc_applied[body_index] = np.random.uniform(-f[i], f[i], 6)
 
         
         if use_viewer:
@@ -190,8 +197,6 @@ class Simulator(object):
                     self._simulation_step_with_timings(real_time)
                     self.update_visuals(viewer)
                     viewer.sync()
-
-                
                     if self._stop_sim():
                         break
                     
@@ -204,7 +209,6 @@ class Simulator(object):
                 
                 randomForce(self.robot.data)
                 self._simulation_step_with_timings(real_time)
-                
                 
                 if self._stop_sim():
                     break

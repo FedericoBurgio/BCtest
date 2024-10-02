@@ -7,16 +7,19 @@ from datetime import datetime
 import os
 import random
 from main import SimManager
+import nets  # Importing your modified PolicyNetwork
+
 # Get the current date and time
 now = datetime.now()
 date_time_str = now.strftime("%d%H%M")  # Format as DAY-HOUR-MINUTE
 
 # Create the directory if it doesn't exist
 save_dir = "models/" + f"{date_time_str}"
-os.makedirs(save_dir, exist_ok=True)  # This will create the directory if it doesn't already exist
+os.makedirs(save_dir, exist_ok=True)
 
 # Load dataset
-data = np.load("v_w_gaits-jump-trot.npz")
+datasetName = "55s_noRND.npz" 
+data = np.load("datasets/" + datasetName)
 states = data['states']
 qNext = data['qNext']
 
@@ -25,7 +28,7 @@ valid_mask = ~np.isnan(qNext).any(axis=1) & ~np.isnan(states).any(axis=1)
 states = states[valid_mask]
 qNext = qNext[valid_mask]
 
-step = 1
+step = 2
 states = states[::step]
 qNext = qNext[::step]
 
@@ -33,28 +36,37 @@ qNext = qNext[::step]
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 states = torch.tensor(states, dtype=torch.float32).to(device)
 actions = torch.tensor(qNext, dtype=torch.float32).to(device)
-#states = torch.nn.functional.normalize(states)
+
 # Create datasets and dataloaders
+# Reshape the input to add sequence length dimension
+sequence_length = 1  # Define sequence length as needed
+states = states.unsqueeze(1)  # Shape: [batch_size, sequence_length, input_size]
+
 dataset = TensorDataset(states, actions)
 train_size = int(0.8 * len(dataset))
 val_size = len(dataset) - train_size
 train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-batch_size = 128
+batch_size = 256
 train_loader = DataLoader(train_dataset, batch_size, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size, shuffle=False)
 
-import nets
-
-state_size = states.shape[1]
+state_size = states.shape[2]  # Input size is the last dimension
 action_size = actions.shape[1]
-model = nets.PolicyNetwork(state_size, action_size).to(device)
+hidden_layers = [256, 256]
+rnn_hidden_size = 256
+num_rnn_layers = 1
 
-criterion = nn.MSELoss()  # MSE for continuous actions
-optimizer = optim.Adam(model.parameters(), lr=0.001)
+# Initialize the model
+model = nets.PolicyNetwork(state_size, action_size, hidden_layers, rnn_hidden_size, num_rnn_layers).to(device)
+np.savez(save_dir + "/NNprop.npz", s_size=state_size, a_size=action_size, h_layers=hidden_layers)
+
+criterion = nn.MSELoss()
+optimizer = optim.Adam(model.parameters(), lr=1e-4)
+scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=15, factor=0.5, min_lr=1e-6)
 
 # Training loop variables
-num_epochs = 500 * step
+num_epochs = 250 * step
 best_val_loss = float('inf')
 best_policy = None
 train_losses = []
@@ -69,7 +81,8 @@ try:
         for batch_states, batch_actions in train_loader:
             optimizer.zero_grad()
             
-            batch_states = batch_states + torch.normal(mean=0, std=0.01, size=batch_states.shape).to(device)
+            # Add noise if desired (optional)
+            # batch_states += torch.normal(mean=0, std=0.01, size=batch_states.shape).to(device)
 
             predicted_train_actions = model(batch_states)
             train_loss = criterion(predicted_train_actions, batch_actions)
@@ -88,6 +101,8 @@ try:
                 total_val_loss += val_loss.item()
         average_val_loss = total_val_loss / len(val_loader)
 
+        scheduler.step(average_val_loss)
+
         # Store losses
         train_losses.append(average_train_loss)
         val_losses.append(average_val_loss)
@@ -98,14 +113,13 @@ try:
             best_policy = model.state_dict()
 
         print(f'Epoch {epoch+1}/{num_epochs}, Train Loss: {average_train_loss:.4e}, Val Loss: {average_val_loss:.4e}, Best Val Loss: {best_val_loss:.4e}')
-
+        
         # Save the best policy every 10 epochs
         if (epoch + 1) % 10 == 0:
             model_path = f'{save_dir}/best_policy_ep{epoch+1}.pth'
             torch.save(best_policy, model_path)
             print(f'Model saved to {model_path}')
-            #SimManager(1)
-
+        
 except KeyboardInterrupt:
     print("Training interrupted. Saving the best model...")
 
