@@ -8,21 +8,24 @@ import time
 import numpy as np
 
 from mj_pin_wrapper.mj_robot import MJQuadRobotWrapper
+#from mj_pin_wrapper.mj_pin_robot import MJPinQuadRobotWrapper
 from mj_pin_wrapper.abstract.controller import ControllerAbstract
 from mj_pin_wrapper.abstract.data_recorder import DataRecorderAbstract
-
+import pinocchio as pin
+from pinocchio.utils import zero
 
 import numpy as np
 class Simulator(object):
     DEFAULT_SIM_DT = 1.0e-3 #s
     def __init__(self,
-                 robot: MJQuadRobotWrapper,
+                 robot,#: MJPinQuadRobotWrapper,
                  controller: ControllerAbstract = None,
                  data_recorder: DataRecorderAbstract = None,
                  sim_dt : float = 1.0e-3,
                  ) -> None:
         
-        self.robot = robot
+        self.robot = robot.mj
+        self.pin_wrapper = robot
         self.controller = (controller
                             if controller != None
                             else ControllerAbstract(robot)
@@ -61,14 +64,11 @@ class Simulator(object):
         """
         # Get state in Pinocchio format (x, y, z, qx, qy, qz, qw)
         self.q, self.v = self.robot.get_state()
-
-        
         
         # Torques should be a map {joint_name : torque value}
         torques = self.controller.get_torques(self.q,
                                               self.v,
                                               robot_data = self.robot.data)
-        
         # Record data
         self.data_recorder.record(self.q,
                                   self.v,
@@ -130,6 +130,12 @@ class Simulator(object):
             **kwargs,
             ) -> None:
         randomize = kwargs.get("randomize", False)
+        mode = kwargs.get("mode", -1)
+        comb = kwargs.get("comb", [])
+        fails = kwargs.get("fails", 0)
+        pertStep = kwargs.get("pertStep", -1)
+        pertNomqs = kwargs.get("pertNomqs", [])
+        pertNomvs = kwargs.get("pertNomvs", [])
         """
         Run simulation for <simulation_time> seconds with or without a viewer.
 
@@ -153,31 +159,142 @@ class Simulator(object):
         self.stop_on_collision = kwargs.get("stop_on_collision", False)
         self.visual_callback_fn = visual_callback_fn
         
+        def apply_perturbation():
+            # Extract the model and data from the wrapper
+            q = self.robot.get_state()[0]   
+            v = self.robot.get_state()[1]
+            cntBools= self.controller.gait_gen.cnt_plan[0].flatten()[::4]
+            #self.pin_wrapper = self.robot
+            pin_model = self.pin_wrapper.pin.model
+            data = self.pin_wrapper.pin.data
+
+            self.pin_wrapper.reset(q, v)
+            pin.computeJointJacobians(pin_model, data, q)
+            #pin.forwardKinematics(pin_model, data, q, v)
+
+            nq = pin_model.nq  # Number of configuration variables (19)
+            nv = pin_model.nv  # Number of velocity variables (18)
+
+            # Frame IDs of the end-effectors (modify these IDs according to your robot's end-effectors)
+            EE_frames_all = np.array([14, 26, 42, 54], dtype=int)  # Ensure dtype is int
+            EE_frames = EE_frames_all[cntBools == 1]
+
+            cnt_jac = np.zeros((3*len(EE_frames), nv))
+            cnt_jac_dot = np.zeros((3*len(EE_frames), nv))
+
+            def rotate_jacobian(jac, index):
+                world_R_joint = pin.SE3(data.oMf[index].rotation, zero(3))
+                return world_R_joint.action @ jac
+
+            for ee_cnt in range(len(EE_frames)):
+
+                jac = pin.getFrameJacobian(pin_model,\
+                    data,\
+                    int(EE_frames[ee_cnt]),\
+                    pin.ReferenceFrame.LOCAL)
+                cnt_jac[3*ee_cnt:3*(ee_cnt+1),] = rotate_jacobian(jac,int(EE_frames[ee_cnt]))[0:3,]
+                jac_dot = pin.getFrameJacobianTimeVariation(pin_model,\
+                    data,\
+                    int(EE_frames[ee_cnt]),\
+                    pin.ReferenceFrame.LOCAL)
+                cnt_jac_dot[3*ee_cnt:3*(ee_cnt+1),] = rotate_jacobian(jac_dot,int(EE_frames[ee_cnt]))[0:3,]
+
+                min_ee_height=.0
+            while min_ee_height >= 0:
+                #np.random.seed(seed=seed)
+                perturbation_pos = np.concatenate((
+                    np.random.uniform(-0.15, 0.15, 3),
+                    np.random.uniform(-0.15, 0.15, 3),
+                    np.random.uniform(-0.32, 0.32, nv - 6)
+                ))
+
+                perturbation_vel = np.random.uniform(-0.18, 0.18, nv)
+                if EE_frames.size == 0:
+                    random_pos_vec = perturbation_pos
+                    random_vel_vec = perturbation_vel
+                else:
+                    random_pos_vec = (np.identity(nv) - np.linalg.pinv(cnt_jac)@\
+                                cnt_jac) @ perturbation_pos
+                    jac_vel = cnt_jac_dot * perturbation_pos + cnt_jac * perturbation_vel
+                    random_vel_vec = (np.identity(nv) - np.linalg.pinv(jac_vel)@\
+                                jac_vel) @ perturbation_pos
+
+                ### add perturbation to nominal trajectory
+                v0_ = v + random_vel_vec
+                q0_ = pin.integrate(pin_model, \
+                    q, random_pos_vec)
+
+                ### check if the swing foot is below the ground
+                # pin.forwardKinematics(pin_model, data, q0_, v0_)
+                # self.pin_wrapper.reset(q0_, v0_)
+                # pin.framesForwardKinematics(pin_model, data, q)
+                # pin.updateFramePlacements(pin_model, data)
+                ee_below_ground = []
+                self.pin_wrapper.reset(q0_, v0_)
+                for e in range(len(EE_frames_all)):
+                    frame_id = int(EE_frames_all[e])
+                    if data.oMf[frame_id].translation[2] < 0.0001:
+                        ee_below_ground.append(1)
+                if len(ee_below_ground) == 0: # ee_below_ground==[]
+                    min_ee_height = -1.
+
+            return q0_, v0_
+            
+        if len(comb) != 0:
+            from mpc_controller.motions.cyclic.go2_jump import jump
+            from mpc_controller.motions.cyclic.go2_trot import trot
+            gaits = [trot, jump]
+            switch_step = simulation_time * 1000
+            simulation_time *= len(comb)
+        
         if self.verbose:
             print("-----> Simulation start")
         
         self.sim_step = 0
         self.robot.xfrc_applied = []
-        # With viewer
-        def randomForce(selfRobotData):
-            if randomize:
-                
-                timing = np.array([20, 150, 900])
-                f=np.array([20, 400, 450])
-                if self.data_recorder.gait_index == 1: f=f*0.3
-                
+        self.gait_index = -1
+        
+        def resetToPerturbation():
+            if pertStep > 0:
+                if self.sim_step % pertStep == 0: #and self.sim_step > 0:
+                    #breakpoint()
+                    self.robot.update(pertNomqs[self.sim_step//pertStep], pertNomvs[self.sim_step//pertStep])
+                                        
+                    print("Perturbation applied")
+        
+        def randomForce(selfRobotData, timing, f):
+            if randomize: #nota per recoording: usare self.data_recorder.gait_index, per testing trained usare self.controller.gait_index 
+                if self.gait_index == 1: f=f*0.3
                 for i in range(len(timing)):
                     if self.sim_step % timing[i] == 0:
                         body_index = np.random.randint(14)
-                        if body_index == 1 and self.data_recorder.gait_index == 0:
+                        if body_index == 1 and self.gait_index == 0: #nota per recoording: usare self.data_recorder.gait_index, per testing trained usare self.controller.gait_index 
                             selfRobotData.xfrc_applied[body_index] = 2*np.random.uniform(-f[i], f[i], 6)
                         else:
                             selfRobotData.xfrc_applied[body_index] = np.random.uniform(-f[i], f[i], 6)
 
-        
+        def RTswitch():
+            if len(comb) != 0 and self.sim_step % switch_step == 0:
+                iteration = int(self.sim_step / switch_step)
+                v_des = np.zeros(3) 
+                #breakpoint()
+                self.gait_index = comb[iteration][0]
+                sel_gait = gaits[int(self.gait_index)]    
+                v_des[0:2] = comb[iteration][1:3] 
+                w_des = comb[iteration][3]#np.random.uniform(-0.02, 0.02)
+                self.controller.set_command(v_des, w_des)
+                self.controller.set_gait_params(sel_gait)
+                print("Switching, step: ",self.sim_step )
+                    
+        self.timing = np.array([np.random.randint(25,35), np.random.randint(280,320), np.random.randint(850,950)])
+        #self.timing = np.array([np.random.randint(23,33)])#, np.random.randint(850,950)])
+        self.f=np.array([30, 400, 450])   
+        #self.f=np.array([18])#, 350])   
+        # With viewer
         if use_viewer:
-            for i in range(14):
-                print('name of geom ', i, ': ', self.robot.model.body(i).name)    
+            #for i in range(14):
+                #print('name of geom ', i, ': ', self.robot.model.body(i).name) 
+            
             with mujoco.viewer.launch_passive(self.robot.model, self.robot.data) as viewer:
                             
                             # Enable wireframe rendering of the entire scene.
@@ -188,17 +305,25 @@ class Simulator(object):
                 viewer.sync()
                 sim_start_time = time.time()
                 
-                applied = False
                 while (viewer.is_running() and #reminder: la differenza in applicare la forza qua o dove non si usa il viewer è che self.robot.data.xfrc_applied qua resta con la forza (gneeralizzata) applicata un unico time step, mentre se la applico doe non c'è il viewer resta applicata ( per sempre(?))
                     (simulation_time < 0. or
                         self.sim_step * self.sim_dt < simulation_time)):
-                    
-                    randomForce(self.robot.data)
+                    # if self.sim_step == 0:
+                    #     time.sleep(1)
+                    # if self.sim_step < 100:
+                    #     time.sleep(0.1)
+                    RTswitch()
+                    #resetToPerturbation()
+                    randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
+                    #print("Step: ", self.sim_step)
+
                     self._simulation_step_with_timings(real_time)
                     self.update_visuals(viewer)
                     viewer.sync()
+           
                     if self._stop_sim():
                         break
+                    
                     
         # No viewer
         else:
@@ -207,7 +332,9 @@ class Simulator(object):
                 if np.any(self.robot.data.xfrc_applied != 0):
                     self.robot.data.xfrc_applied = np.zeros_like(self.robot.data.xfrc_applied)   
                 
-                randomForce(self.robot.data)
+                RTswitch()
+                #resetToPerturbation()
+                randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
                 self._simulation_step_with_timings(real_time)
                 
                 if self._stop_sim():

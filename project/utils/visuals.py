@@ -29,11 +29,12 @@ def desired_contact_locations_callback(viewer,
     if UPDATE_VISUALS_STEPS % UPDATE_VISUALS_STEPS == 0: 
         
         # Next contacts in base frame (except height in world frame)
-        horizon_step = controller.gait_gen.horizon
-        contact_step = max(horizon_step // N_NEXT_CONTACTS, 1)
-        next_contacts_B = controller.gait_gen.cnt_plan[::contact_step, :, 1:].reshape(-1, 3)
-        all_contact_W = np.empty_like(next_contacts_B)
+        horizon_step = controller.gait_gen.horizon #10
+        contact_step = max(horizon_step // N_NEXT_CONTACTS, 1) #1
         
+        next_contacts_B = controller.gait_gen.cnt_plan[::contact_step, :, 1:].reshape(-1, 3)
+        #print(controller.gait_gen.cnt_plan)
+        all_contact_W = np.empty_like(next_contacts_B)
         # Base transform in world frame
         W_T_B = pin.XYZQUATToSE3(q[:7])
         
@@ -59,3 +60,5 @@ def desired_contact_locations_callback(viewer,
                 rgba=color,
             )
         viewer.user_scn.ngeom = i + 1
+ 
+   
