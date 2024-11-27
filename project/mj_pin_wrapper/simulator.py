@@ -155,7 +155,7 @@ class Simulator(object):
             - stop_on_collision (bool, optional): Stop the simulation when there is a collision.
         """
         real_time = kwargs.get("real_time", use_viewer)
-        self.verbose = kwargs.get("verbose", True)
+        self.verbose = kwargs.get("verbose", False)
         self.stop_on_collision = kwargs.get("stop_on_collision", False)
         self.visual_callback_fn = visual_callback_fn
         
@@ -264,12 +264,12 @@ class Simulator(object):
         
         def randomForce(selfRobotData, timing, f):
             if randomize: #nota per recoording: usare self.data_recorder.gait_index, per testing trained usare self.controller.gait_index 
-                if self.gait_index == 1: f=f*0.3
+                if self.gait_index == 1: f=f*0.5
                 for i in range(len(timing)):
                     if self.sim_step % timing[i] == 0:
                         body_index = np.random.randint(14)
-                        if body_index == 1 and self.gait_index == 0: #nota per recoording: usare self.data_recorder.gait_index, per testing trained usare self.controller.gait_index 
-                            selfRobotData.xfrc_applied[body_index] = 2*np.random.uniform(-f[i], f[i], 6)
+                        if body_index == 1: #nota per recoording: usare self.data_recorder.gait_index, per testing trained usare self.controller.gait_index 
+                            selfRobotData.xfrc_applied[body_index] = 2.5*np.random.uniform(-f[i], f[i], 6)
                         else:
                             selfRobotData.xfrc_applied[body_index] = np.random.uniform(-f[i], f[i], 6)
 
@@ -286,10 +286,10 @@ class Simulator(object):
                 self.controller.set_gait_params(sel_gait)
                 print("Switching, step: ",self.sim_step )
                     
-        self.timing = np.array([np.random.randint(25,35), np.random.randint(280,320), np.random.randint(850,950)])
+        self.timing = np.array([np.random.randint(15,25), np.random.randint(180,220), np.random.randint(550,650)])
         #self.timing = np.array([np.random.randint(23,33)])#, np.random.randint(850,950)])
-        self.f=np.array([30, 400, 450])   
-        #self.f=np.array([18])#, 350])   
+        self.f=np.array([25, 300, 850])   
+        #self.f=np.array((18])#, 350])   
         # With viewer
         if use_viewer:
             #for i in range(14):
@@ -297,7 +297,7 @@ class Simulator(object):
             
             with mujoco.viewer.launch_passive(self.robot.model, self.robot.data) as viewer:
                             
-                            # Enable wireframe rendering of the entire scene.
+                # Enable wireframe rendering of the entire scene.
                 viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
                 viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_FOG] = 0
                 viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
@@ -313,6 +313,7 @@ class Simulator(object):
                     # if self.sim_step < 100:
                     #     time.sleep(0.1)
                     RTswitch()
+                   # print(self.robot.data.time)
                     #resetToPerturbation()
                     randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
                     #print("Step: ", self.sim_step)
@@ -331,7 +332,7 @@ class Simulator(object):
             while (simulation_time < 0. or self.sim_step < simulation_time * (1 / self.sim_dt)):
                 if np.any(self.robot.data.xfrc_applied != 0):
                     self.robot.data.xfrc_applied = np.zeros_like(self.robot.data.xfrc_applied)   
-                
+               
                 RTswitch()
                 #resetToPerturbation()
                 randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))

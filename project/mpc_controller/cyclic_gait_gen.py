@@ -229,19 +229,19 @@ class CyclicQuadrupedGaitGen:
             self.mp.set_contact_plan(self.cnt_plan[i], dt)
             self.dt_arr[i] = dt
         
-        #da qua in poi provo a deallocare roba manualmente per vedere come va
-        del com
-        del z_height
-        del vtrack
-        del R
-        del hip_loc
-        del raibert_step
-        del ang_step
-        del ft
-        del phase_percent   
-        del i
-        del j
-        del dt
+        # #da qua in poi provo a deallocare roba manualmente per vedere come va
+        # del com
+        # del z_height
+        # del vtrack
+        # del R
+        # del hip_loc
+        # del raibert_step
+        # del ang_step
+        # del ft
+        # del phase_percent   
+        # del i
+        # del j
+        # del dt
         # del self.cnt_plan
         # del self.mp
         # del self.dt_arr
@@ -250,7 +250,7 @@ class CyclicQuadrupedGaitGen:
         
             
     def compute_raibert_contact_plan(self, q, v, t, v_des, w_des):
-        self._update_pin_data(q, v)
+        #self._update_pin_data(q, v)
 
         com = np.round(pin.centerOfMass(self.robot.model, self.robot.data, q, v)[0:2], 3)
         z_height = pin.centerOfMass(self.robot.model, self.robot.data, q, v)[2] - self.height_offset

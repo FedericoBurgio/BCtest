@@ -18,6 +18,7 @@ trot = BiconvexMotionParams("go2", "Jump")
 trot.gait_horizon = 1.
 
 # Gait period (s)
+#trot.gait_period = np.random.uniform(0.4, 0.6)
 trot.gait_period = 0.5
 # Gait stance percent [0,1] [FR, FL, RR, RL]
 trot.stance_percent = [0.6] * 4

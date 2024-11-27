@@ -28,7 +28,9 @@ from mj_pin_wrapper.simulator import Simulator
 from utils.visuals import desired_contact_locations_callback
 from utils.config import Go2Config
 
-def apply_perturbation(q: np.ndarray, v: np.ndarray, cntBools: np.ndarray, pin_wrapper,seed=None):
+from applyPert import apply_perturbation
+
+def apply_perturbationBUP(q: np.ndarray, v: np.ndarray, cntBools: np.ndarray, pin_wrapper,seed=None):
 
     # Extract the model and data from the wrapper
     pin_model = pin_wrapper.pin.model
@@ -95,6 +97,8 @@ def apply_perturbation(q: np.ndarray, v: np.ndarray, cntBools: np.ndarray, pin_w
 
     delta_qv = np.concatenate([delta_q, delta_v])
     
+    #NOTA BENE
+    #delta_qv = np.zeros(2*nv)
     # Compute the projection matrix
     if A_c.shape[0] > 0:
         A_c_pinv = np.linalg.pinv(A_c)
@@ -191,12 +195,14 @@ def apply_perturbationOLD(q: np.ndarray, v: np.ndarray, cntBools: np.ndarray, pi
         ### add perturbation to nominal trajectory
         v0_ = v + random_vel_vec
         q0_ = pin.integrate(pin_model, \
-            q, random_pos_vec)
-        
+            q, random_pos_vec) #random_pos_vec, vel * dt ,where dt is implicit  
+        ###NOTA BENE
+        # v0_ = v
+        # q0_ = q 
         ### check if the swing foot is below the ground
         pin.forwardKinematics(pin_model, data, q0_, v0_)
         pin_wrapper.reset(q0_, v0_)
-        pin.framesForwardKinematics(pin_model, data, q)
+        pin.framesForwardKinematics(pin_model, data, q0_)
         pin.updateFramePlacements(pin_model, data)
         ee_below_ground = []
         for e in range(len(EE_frames_all)):
@@ -219,18 +225,24 @@ controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
 recorder = Recorders.DataRecorderNominal(controller)
 simulator = Simulator(robot, controller, recorder)
 
-sim_time = 1.1 # seconds
+comb = [[1,0.3,0,0]]
+
+sim_time = 0.5 # seconds
 simulator.run(
     simulation_time=sim_time,
     use_viewer=0,
     real_time=False,
     visual_callback_fn=None,
     randomize=False,
-    comb = [[0,0.3,0,0]]
+    comb = comb
 )
 
 qNom, vNom, cntBools = recorder.getNominal(20)
-
+#qNom, vNom, cntBools = recorder.getNominal(20) #stato 6 ha qualcosa che non va
+# qNom=qNom[:12]
+# vNom=vNom[:12]
+# cntBools=cntBools[:12] 
+  
 del cfg
 del robot
 del controller
@@ -258,11 +270,11 @@ robot.pin.info()
 for i in range(len(qNom)):
     print("State", i)   
     # Set the initial position and velocity
-    apply_perturbation(qNom[i], vNom[i], cntBools[i], robot, seed = 2*i)    
+    robot.reset(qNom[i], vNom[i])
     with mujoco.viewer.launch_passive(robot.mj.model, robot.mj.data) as viewer:
         # Render the state in the viewer
         
-        print("NEW", cntBools[i])
+        print("Nominal", cntBools[i])
         viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
         viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
         viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
@@ -274,10 +286,12 @@ for i in range(len(qNom)):
 
         # Optional: Pause for a moment to visualize the state
         input()
-    apply_perturbationOLD(qNom[i], vNom[i], cntBools[i], robot,seed=i*2)    
+    
+    apply_perturbation(qNom[i], vNom[i], cntBools[i], robot, gait=comb[0][0])    
     with mujoco.viewer.launch_passive(robot.mj.model, robot.mj.data) as viewer:
         # Render the state in the viewer
-        print("oLD",cntBools[i])
+        
+        print("OLD", cntBools[i])
         viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
         viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
         viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
@@ -289,6 +303,21 @@ for i in range(len(qNom)):
 
         # Optional: Pause for a moment to visualize the state
         input()
+    # apply_perturbationBUP(qNom[i], vNom[i], cntBools[i], robot,seed=i*2)    
+    # with mujoco.viewer.launch_passive(robot.mj.model, robot.mj.data) as viewer:
+    #     # Render the state in the viewer
+    #     print("NEW",cntBools[i])
+    #     viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = True
+    #     viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTFORCE] = True
+    #     viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_REFLECTION] = 0
+    #     viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_FOG] = 0
+    #     viewer.user_scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
+        
+    #     viewer.sync()
+    #     #viewer.render()
+
+    #     # Optional: Pause for a moment to visualize the state
+    #     input()
 
 # Close the viewer when done
 viewer.close()
