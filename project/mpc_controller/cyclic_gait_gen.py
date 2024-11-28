@@ -229,26 +229,7 @@ class CyclicQuadrupedGaitGen:
             self.mp.set_contact_plan(self.cnt_plan[i], dt)
             self.dt_arr[i] = dt
         
-        # #da qua in poi provo a deallocare roba manualmente per vedere come va
-        # del com
-        # del z_height
-        # del vtrack
-        # del R
-        # del hip_loc
-        # del raibert_step
-        # del ang_step
-        # del ft
-        # del phase_percent   
-        # del i
-        # del j
-        # del dt
-        # del self.cnt_plan
-        # del self.mp
-        # del self.dt_arr
-        # del self.swing_time
-        # del self.height_map
-        
-            
+    
     def compute_raibert_contact_plan(self, q, v, t, v_des, w_des):
         #self._update_pin_data(q, v)
 
@@ -550,42 +531,45 @@ class CyclicQuadrupedGaitGen:
             self.create_cnt_plan(q_origin, v, t, v_des, w_des)
         else:
             self.follow_contact_plan(q, t, cnt_plan_des)
-            
         # Creates costs for IK and Dynamics
-        self.create_costs(q_origin, v, v_des, w_des, ori_des)
+        # self.create_costs(q_origin, v, v_des, w_des, ori_des)
 
-        # pinocchio complains otherwise 
-        q = pin.normalize(self.robot.model, q_origin)
-        self.kd.optimize(q_origin, v, 100, 1)
+        # # pinocchio complains otherwise 
+        # q = pin.normalize(self.robot.model, q_origin)
+        # self.kd.optimize(q_origin, v, 100, 1)
 
         # Results
         #com_opt = self.mp.return_opt_com()
         #mom_opt = self.mp.return_opt_mom()
-        F_opt = self.mp.return_opt_f()
-        xs = self.ik.get_xs()
-        us = self.ik.get_us()
+        # F_opt = self.mp.return_opt_f()
+        #breakpoint()
+        # xs = self.ik.get_xs()
+        # us = self.ik.get_us()
 
-        n_eff_3d = 3*self.n_eeff
-        step_dt = int(self.dt_arr[0]/self.sim_dt)
-        if not hasattr(self, "f_int"):
-            self.f_int = np.empty((self.size * step_dt, n_eff_3d), dtype=np.float32)
-            self.xs_int = np.empty((self.size * step_dt, self.robot.model.nv + self.robot.model.nq), dtype=np.float32)
-            self.us_int = np.empty((self.size * step_dt, len(us[0])), dtype=np.float32)
-            #self.com_int = np.empty((self.size * step_dt, len(com_opt[0, :])), dtype=np.float32)
-            #self.mom_int = np.empty((self.size * step_dt, len(mom_opt[0, :])), dtype=np.float32)
+        # n_eff_3d = 3*self.n_eeff
+        # step_dt = int(self.dt_arr[0]/self.sim_dt)
+        # if not hasattr(self, "f_int"):
+        #     self.f_int = np.empty((self.size * step_dt, n_eff_3d), dtype=np.float32)
+        #     self.xs_int = np.empty((self.size * step_dt, self.robot.model.nv + self.robot.model.nq), dtype=np.float32)
+        #     self.us_int = np.empty((self.size * step_dt, len(us[0])), dtype=np.float32)
+        #     #self.com_int = np.empty((self.size * step_dt, len(com_opt[0, :])), dtype=np.float32)
+        #     #self.mom_int = np.empty((self.size * step_dt, len(mom_opt[0, :])), dtype=np.float32)
         
-        for i in range(self.size):
-            self.f_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(F_opt[i*n_eff_3d:n_eff_3d*(i+1)], F_opt[n_eff_3d*(i+1):n_eff_3d*(i+2)], step_dt, dtype=np.float32)
-            self.xs_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(xs[i], xs[i+1], step_dt, dtype=np.float32)
-            self.us_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(us[i], us[i+1], step_dt, dtype=np.float32)
-            #self.com_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(com_opt[i], com_opt[i+1], step_dt, dtype=np.float32)
-            #self.mom_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(mom_opt[i], mom_opt[i+1], step_dt, dtype=np.float32)
+        # for i in range(self.size):
+        #     self.f_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(F_opt[i*n_eff_3d:n_eff_3d*(i+1)], F_opt[n_eff_3d*(i+1):n_eff_3d*(i+2)], step_dt, dtype=np.float32)
+        #     self.xs_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(xs[i], xs[i+1], step_dt, dtype=np.float32)
+        #     self.us_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(us[i], us[i+1], step_dt, dtype=np.float32)
+        #     #self.com_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(com_opt[i], com_opt[i+1], step_dt, dtype=np.float32)
+        #     #self.mom_int[i * step_dt : (i+1) * step_dt, :] =  np.linspace(mom_opt[i], mom_opt[i+1], step_dt, dtype=np.float32)
+        
+        # self.f_int = np.empty((self.size * step_dt, n_eff_3d), dtype=np.float32)
+        # self.xs_int = np.empty((self.size * step_dt, self.robot.model.nv + self.robot.model.nq), dtype=np.float32)
+        # self.us_int = np.empty((self.size * step_dt, len(us[0])), dtype=np.float32)
+        # self.q_traj.append(q)
+        # self.v_traj.append(v)
+        # self.xs_traj.append(xs)
 
-        self.q_traj.append(q)
-        self.v_traj.append(v)
-        self.xs_traj.append(xs)
-
-        return self.xs_int, self.us_int, self.f_int
+        #return self.xs_int, self.us_int, self.f_int
 
     def plot(self, q, v, plot_force = True):
         com_opt = self.mp.return_opt_com()

@@ -186,14 +186,14 @@ vy = np.arange(-0.3,0.4,0.1)
 w = np.arange(-0.07,0.14,0.07)
 comb = list(itertools.product([0,1],vx,vy,[0]))
 RANDOM = True
-VIEWER = False
+VIEWER = True
 PERT = True
 
-num_samples_per_cycle = 1
+num_samples_per_cycle = 7
 pertutbed_episode_duration = 5
 saveName = str(num_samples_per_cycle) + "samples_" +str(pertutbed_episode_duration) + "duration_" + "Forces" + str(RANDOM) + "Pert" + str(PERT) 
-saveName = saveName + "det4_999"
+saveName = saveName + "det4_TESTPLAN"
 Record_with_pert(num_samples_per_cycle,             #num nsamples per cycle - 
                 pertutbed_episode_duration,            #pertubed episode duration
                 saveName,#"testGrid10_1-2BIScon05",
-                comb_= comb)       #saved dataset name
+                comb_= [[0,0.3,0,0]])       #saved dataset name

@@ -22,12 +22,24 @@ class DataRecorderPD(object):
     
         s = np.concatenate((q[2:], v))  #len 35 q = #19-2, v = #18
         
-        cnt_base = detectContact.detect_contact_steps4(self.controller_.gait_gen.cnt_plan,q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
+        q_copy = q.copy()
+        v_copy = v.copy()
+        q_copy[:2] = 0.
+
+        t = robot_data.time
+        self.robot.update(q_copy, v_copy)
+        cnt_plan = self.controller_.gait_gen.compute_raibert_contact_plan(q_copy, v_copy, t, self.v_des, self.w_des)
+        #self.gait_gen.cnt_plan = cnt_plan
+        self.robot.update(q, v)
+        
+        #cnt_base = detectContact.detect_contact_steps4(self.controller_.gait_gen.cnt_plan,q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
+        cnt_base = detectContact.detect_contact_steps4(cnt_plan,q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
+        
         s = np.append(s, cnt_base[0].flatten()) # actual next contact
         s = np.append(s, cnt_base[1]) # timesteps. Note: NOT expressed in seconds #len 52
         
         #len 52
-        tmp = self.controller_.gait_gen.cnt_plan[0] #actual bool xyz for ech EE
+        tmp = cnt_plan[0] #actual bool xyz for ech EE
         tmp[:,1:] = detectContact.express_contact_plan_in_consistant_frame(q,tmp[:,1:],True) #express xyz in base frame
         s = np.append(s, tmp.flatten()) # add bool xyz #16 [4x4] 
         s = np.append(s, 0)#add time step #1
@@ -84,8 +96,7 @@ class DataRecorderPD(object):
                 f.create_dataset('qNext', data=new_actions, maxshape=(None, new_actions.shape[1]), chunks=True)
         self.s_list.clear()
         self.qNext_list.clear()
-
-    
+  
 class DataRecorderNominal(object):
     def __init__(self, controller, record_dir = "") -> None:
         self.record_dir = "datasets/" + record_dir

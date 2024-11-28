@@ -62,7 +62,6 @@ class TrainedControllerPD(BiConMPC):
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-
         self.policy = torch.load(datasetPath)        
         self.gait_index = -1
         
@@ -71,7 +70,6 @@ class TrainedControllerPD(BiConMPC):
         self.policy.eval()  # Set the model to evaluation mode
         self.count = 0
     
-    
     def get_torques(self,
                 q: np.array,
                 v: np.array,
@@ -79,19 +77,24 @@ class TrainedControllerPD(BiConMPC):
                 **kwargs
                 ):
         super().get_torques(q, v, robot_data)
-        self.count = self.count + 1 
+        #self.count = self.count + 1 
         import numpy as np
         import torch
         # import joblib
-        q_copy = q.copy()
-        v_copy = v.copy()
+        
+        # q_copy = q.copy()
+        # v_copy = v.copy()
+        # q_copy[:2] = 0.
 
-        t = robot_data.time
+        # t = robot_data.time
         # self.robot.update(q_copy, v_copy)
         # cnt_plan = self.gait_gen.compute_raibert_contact_plan(q_copy, v_copy, t, self.v_des, self.w_des)
         # self.gait_gen.cnt_plan = cnt_plan
-        if self.count % 100 == 0: print(self.gait_gen.cnt_plan) 
-        if self.count == 1000: breakpoint()
+        # self.robot.update(q, v)
+        
+        #if self.count % 100 == 0: print(self.gait_gen.cnt_plan) 
+        #if self.count == 1000: breakpoint()
+        
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         s = np.concatenate((q[2:], v))  # Example combination of state variables
         
