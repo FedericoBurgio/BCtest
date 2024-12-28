@@ -207,13 +207,12 @@ class BiConMPC(ControllerAbstract):
         """
         
         sim_t = round(robot_data.time, 3)
-        
+
         # Replanning
         if self.pln_ctr == 0:
             pr_st = time.time()
             
-            #self.xs_plan, self.us_plan, self.f_plan = 
-            self.gait_gen.optimize(
+            self.xs_plan, self.us_plan, self.f_plan = self.gait_gen.optimize(
                 q,
                 v,
                 sim_t,
@@ -221,13 +220,13 @@ class BiConMPC(ControllerAbstract):
                 self.w_des,
                 cnt_plan_des=self.get_desired_contacts(q, v))
             
-            # self.diverged = (self._check_if_diverged(self.xs_plan) or
-            #                  self._check_if_diverged(self.us_plan) or
-            #                  self._check_if_diverged(self.f_plan))
-            
+            self.diverged = (self._check_if_diverged(self.xs_plan) or
+                             self._check_if_diverged(self.us_plan) or
+                             self._check_if_diverged(self.f_plan))
+            #self.diverged = False
             pr_et = time.time() - pr_st
         
-        # Second loop onwards lag is taken into account
+        ##Second loop onwards lag is taken into account
         if (
             self.step > 0 and
             self.sim_opt_lag and
@@ -243,7 +242,7 @@ class BiConMPC(ControllerAbstract):
         ):
             self.index = 0
 
-        # Compute torques
+        ## Compute torques
         tau = self.robot_id_ctrl.id_joint_torques(
             q,
             v,
@@ -260,13 +259,14 @@ class BiConMPC(ControllerAbstract):
         }
 
         # Increment timing variables
+        self._step()
         keys = ['FL_hip', 'FR_hip', 'RL_hip', 'RR_hip',
          'FL_thigh', 'FR_thigh', 'RL_thigh', 'RR_thigh',
         'FL_calf', 'FR_calf', 'RL_calf', 'RR_calf']
         torques = {}
         for key in keys:
             torques[key] = 0.0   
-        self._step()
-        return torques
+        
         return torque_command
+        return torques
     

@@ -214,7 +214,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
     return best_policy, train_losses, val_losses
 
 # Main script
-dataset_name = "1samples_5duration_ForcesTruePertTruedet4_999.h5"  # Specify dataset name
+dataset_name = "1samples_5duration_ForcesTruePertFalsedet4_new.h5"  # Specify dataset name
 states, qNext = load_data(dataset_name)
 save_dir = create_save_folder()
 
@@ -235,20 +235,23 @@ step = 1
 #states = np.delete(states,np.r_[69:78],axis=1) 
 
 # #states = np.delete(states, [-5,-6,-7], axis=1)
-states = np.delete(states, np.r_[73:78], axis=1)
+states = tuple(
+    tuple(state[i] * 0.05 if i == 51 else state[i] for i in range(len(state)))
+    for state in states
+)
+states = np.delete(states, np.r_[0,1], axis=1)
+#states = np.delete(states, np.r_[52:69, 73:78], axis=1)
+#states = np.delete(states, np.r_[35:69], axis=1)
+
 
 # # Remove NaN values
 # # valid_mask = ~np.isnan(qNext).any(axis=1) & ~np.isnan(states).any(axis=1)
-
-
-
 
 #states = np.delete(states, columns_to_remove, axis=1)
 #breakpoint()
 #states = np.delete(states, np.r_[53:56, 57:60, 61:64, 65:68, 73, 74, 75, 76, 77], axis=1) #phase 0,1,2,3, gait index
 
 states, actions, device = preprocess_data(states, qNext, step)
-
 
 # Create dataloaders
 batch_size = 128

@@ -45,7 +45,7 @@ def apply_perturbation(q: np.ndarray, v: np.ndarray,
                 np.random.uniform(-.4, 0.4, nv - 6)  # Joint positions
             ))
             perturbation_vel = np.random.normal(0, 0.3, nv)
-        elif gait == 1:
+        elif gait == 1 or gait == 2:
             perturbation_pos = np.concatenate((
                 [0,0,0],  # Base position
                 np.random.uniform(-0.2, 0.2, 3),   # Base orientation

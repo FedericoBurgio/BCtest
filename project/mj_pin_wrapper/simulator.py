@@ -136,6 +136,7 @@ class Simulator(object):
         pertStep = kwargs.get("pertStep", -1)
         pertNomqs = kwargs.get("pertNomqs", [])
         pertNomvs = kwargs.get("pertNomvs", [])
+        
         """
         Run simulation for <simulation_time> seconds with or without a viewer.
 
@@ -243,7 +244,8 @@ class Simulator(object):
         if len(comb) != 0:
             from mpc_controller.motions.cyclic.go2_jump import jump
             from mpc_controller.motions.cyclic.go2_trot import trot
-            gaits = [trot, jump]
+            from mpc_controller.motions.cyclic.go2_bound import bound
+            gaits = [trot, jump, bound]
             switch_step = simulation_time * 1000
             simulation_time *= len(comb)
         
@@ -265,6 +267,7 @@ class Simulator(object):
         def randomForce(selfRobotData, timing, f):
             if randomize: #nota per recoording: usare self.data_recorder.gait_index, per testing trained usare self.controller.gait_index 
                 if self.gait_index == 1: f=f*0.5
+                if self.gait_index == 2: f=f*0.8
                 for i in range(len(timing)):
                     if self.sim_step % timing[i] == 0:
                         body_index = np.random.randint(14)
@@ -308,16 +311,10 @@ class Simulator(object):
                 while (viewer.is_running() and #reminder: la differenza in applicare la forza qua o dove non si usa il viewer è che self.robot.data.xfrc_applied qua resta con la forza (gneeralizzata) applicata un unico time step, mentre se la applico doe non c'è il viewer resta applicata ( per sempre(?))
                     (simulation_time < 0. or
                         self.sim_step * self.sim_dt < simulation_time)):
-                    # if self.sim_step == 0:
-                    #     time.sleep(1)
-                    # if self.sim_step < 100:
-                    #     time.sleep(0.1)
                     RTswitch()
-                   # print(self.robot.data.time)
-                    #resetToPerturbation()
                     randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
                     #print("Step: ", self.sim_step)
-
+                    #if self.sim_step == 100: breakpoint()
                     self._simulation_step_with_timings(real_time)
                     self.update_visuals(viewer)
                     viewer.sync()
@@ -334,7 +331,6 @@ class Simulator(object):
                     self.robot.data.xfrc_applied = np.zeros_like(self.robot.data.xfrc_applied)   
                
                 RTswitch()
-                #resetToPerturbation()
                 randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
                 self._simulation_step_with_timings(real_time)
                 

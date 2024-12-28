@@ -3,7 +3,6 @@ import copy
 import numpy as np
 import os
 from typing import Any, Dict, Callable
-#import tensorflow as tf
 import torch
 import pickle
 import time
@@ -36,7 +35,7 @@ import Controllers
 import Recorders
 import time
 
-gaits = [trot, jump]
+gaits = [trot, jump, bound]
 
 from applyPert import apply_perturbation
 
@@ -47,7 +46,7 @@ def rec(comb, q0, v0, cntBools, sim_time, datasetName):
             rotor_inertia=cfg.rotor_inertia,
             gear_ratio=cfg.gear_ratio,
             )
-    if PERT and comb[0][0] == 0:
+    if PERT and (comb[0][0] == 0 or comb[0][0] == 2):
         q0, v0 = apply_perturbation(q0, v0, cntBools, robot, int(comb[0][0]))
         print("pert")
     else:
@@ -181,19 +180,19 @@ def Record_with_pert(noStep, sim_time, datasetName, numSamples = 1, comb_ = []):
 import itertools
 import numpy as np
 vx = np.arange(-0.1,0.6,0.1)
-vy = np.arange(-0.3,0.3,0.1)
 vy = np.arange(-0.3,0.4,0.1)
 w = np.arange(-0.07,0.14,0.07)
-comb = list(itertools.product([0,1],vx,vy,[0]))
-RANDOM = True
-VIEWER = True
-PERT = True
+comb = list(itertools.product([1,0],vx,vy,[0]))
 
-num_samples_per_cycle = 7
+RANDOM = True
+VIEWER = 1
+PERT = False
+
+num_samples_per_cycle = 1
 pertutbed_episode_duration = 5
 saveName = str(num_samples_per_cycle) + "samples_" +str(pertutbed_episode_duration) + "duration_" + "Forces" + str(RANDOM) + "Pert" + str(PERT) 
-saveName = saveName + "det4_TESTPLAN"
+saveName = saveName + "det4_new999"
 Record_with_pert(num_samples_per_cycle,             #num nsamples per cycle - 
                 pertutbed_episode_duration,            #pertubed episode duration
                 saveName,#"testGrid10_1-2BIScon05",
-                comb_= [[0,0.3,0,0]])       #saved dataset name
+                comb_= comb)       #saved dataset name

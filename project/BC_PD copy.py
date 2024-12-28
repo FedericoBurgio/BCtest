@@ -155,9 +155,9 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
 
 # Main script
 if __name__ == '__main__':
-    dataset_name = "1samples_5duration_ForcesTruePertFalsedet3_100_103.h5"  # Specify dataset name
+    dataset_name = "1samples_5duration_ForcesTruePertTruedet4_999.h5"  # Specify dataset name
     states, qNext = load_data(dataset_name)
-    states = np.delete(states, np.r_[69:78], axis=1)
+    states = np.delete(states, np.r_[73:78], axis=1)
     save_dir = create_save_folder()
 
     # Preprocess data

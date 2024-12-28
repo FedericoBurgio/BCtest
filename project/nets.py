@@ -2,10 +2,58 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import torch
+import torch.nn as nn
+
+class PolicyNetworkBUONObis(nn.Module):  # LSTM, 256, 256
+    def __init__(self, input_size, output_size):
+        hidden_layers = [256, 256]
+        rnn_hidden_size = 256
+        num_rnn_layers = 1
+        super(PolicyNetworkBUONObis, self).__init__()
+        
+        # LSTM layer
+        self.rnn = nn.LSTM(input_size, rnn_hidden_size, num_layers=num_rnn_layers, batch_first=True)
+        
+        # Attention layer
+        self.attention = nn.MultiheadAttention(embed_dim=rnn_hidden_size, num_heads=4, batch_first=True)
+        
+        # Fully connected layers
+        self.fc_layers = nn.ModuleList()
+        
+        # First hidden layer
+        self.fc_layers.append(nn.Linear(rnn_hidden_size, hidden_layers[0]))
+        self.fc_layers.append(nn.GELU())
+        
+        # Additional hidden layers
+        for i in range(1, len(hidden_layers)):
+            self.fc_layers.append(nn.Linear(hidden_layers[i - 1], hidden_layers[i]))
+            self.fc_layers.append(nn.GELU())
+        
+        # Final output layer
+        self.fc_layers.append(nn.Linear(hidden_layers[-1], output_size))
+
+    def forward(self, x):
+        # Pass through the LSTM
+        x, _ = self.rnn(x)  # x shape: (batch_size, seq_length, rnn_hidden_size)
+        
+        # Apply attention to the LSTM output
+        attn_output, _ = self.attention(x, x, x)  # Self-attention with query, key, value as LSTM output
+        
+        # Use the last time step's attention-enhanced representation
+        x = attn_output[:, -1, :]  # x shape: (batch_size, rnn_hidden_size)
+        
+        # Pass through the fully connected layers
+        for layer in self.fc_layers:
+            x = layer(x)
+        
+        return x
+
+
 #ERA QUELLA BUONA
 class PolicyNetworkBUONO(nn.Module):# LSTM, 256, 256
     def __init__(self, input_size, output_size):
-        hidden_layers = [256,256]
+        hidden_layers = [256, 256]
         rnn_hidden_size = 256
         num_rnn_layers = 1
         super(PolicyNetworkBUONO, self).__init__()

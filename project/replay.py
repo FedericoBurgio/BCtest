@@ -83,6 +83,10 @@ datasetname = "260954"
 datasetname = "261122"
 datasetname = "261243"
 datasetname = "261643"
+datasetname = "060716"
 datasetname = "261754"
-ep = "final"
-replay(datasetname, ep, [[1, 0.3, 0.1, 0.0],[0, 0, 0.0, 0.0],[1, 0.3, 0.0, 0.0],[0, -0.3, 0.0, 0.0],[1,0.2,0.2,0]], 8)
+datasetname = "111104"
+datasetname = "090816"
+datasetname = "201427"
+ep = "20"
+replay(datasetname, ep, [[0,0.3,0.,0],[0,0,0,0],[1,0.2,0.2,0]], 2.2)

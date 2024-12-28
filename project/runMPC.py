@@ -38,7 +38,7 @@ import Controllers
 import Recorders
 import time
 
-gaits = [trot, jump]
+gaits = [trot, jump, bound]
 
 cfg = Go2Config
 robot = MJPinQuadRobotWrapper(
@@ -48,7 +48,6 @@ robot = MJPinQuadRobotWrapper(
         )
 
 comb = [[0,0.3,0,0]]
-
 controller = BiConMPC(robot.pin, replanning_time=0.05, sim_opt_lag=False)
 recorder = Recorders.DataRecorderNominal(controller)
 simulator = Simulator(robot, controller, recorder)
@@ -56,10 +55,10 @@ recorder.gait_index = comb[0][0]
 
 simulator.run( ##NOMINAL
     simulation_time=10,#.5 = 1 cycle
-    use_viewer=True,
+    use_viewer=1,
     real_time=False,
     visual_callback_fn=None,
     randomize=False,
-    comb = comb,
+    comb = [[2,.7,0,0]],
     verbose = False
 )

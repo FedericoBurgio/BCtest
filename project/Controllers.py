@@ -57,6 +57,8 @@ class TrainedControllerPD(BiConMPC):
                  **kwargs
                  ) -> None:
         #super().__init__(robot, **kwargs)
+        self.ID = "PD"
+        self.policyID = ""
         super().__init__(robot, replanning_time=replanning_time, sim_opt_lag=sim_opt_lag, **kwargs)
         
 
@@ -78,8 +80,7 @@ class TrainedControllerPD(BiConMPC):
                 ):
         super().get_torques(q, v, robot_data)
         #self.count = self.count + 1 
-        import numpy as np
-        import torch
+       
         # import joblib
         
         # q_copy = q.copy()
@@ -98,11 +99,11 @@ class TrainedControllerPD(BiConMPC):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         s = np.concatenate((q[2:], v))  # Example combination of state variables
         
-        cnt_base = detectContact.detect_contact_steps4(self.gait_gen.cnt_plan,q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
+        cnt_base = detectContact.detect_contact_steps4(self.gait_gen.cnt_plan.copy(),q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
         s = np.append(s, cnt_base[0].flatten()) # actual next contact
-        s = np.append(s, cnt_base[1]) # timesteps. Note: NOT expressed in seconds
+        s = np.append(s, cnt_base[1]*0.05) # timesteps. Note: NOT expressed in seconds
         #len 52 
-        tmp = self.gait_gen.cnt_plan[0]
+        tmp = self.gait_gen.cnt_plan[0].copy()
         tmp[:,1:] = detectContact.express_contact_plan_in_consistant_frame(q,tmp[:,1:],True)
         s = np.append(s, tmp.flatten())
         s = np.append(s, 0)
@@ -123,9 +124,18 @@ class TrainedControllerPD(BiConMPC):
         s = np.append(s, self.v_des) #81
         s = np.append(s, self.w_des) #82
         #len 83
-      #  states = np.delete(states, [73,74,75,76,78], axis=1) #phase 0,1,2,3, gait index
-        #s = np.delete(s,np.r_[73:78]) 
-        s = np.delete(s, np.r_[73:78])
+        #states = np.delete(states, [73,74,75,76,78], axis=1) #phase 0,1,2,3, gait index
+        #s = np.delete(s, np.r_[35:69]) #vel cond - 131519
+        #from compareConf import policy, ep, comb, sim_time 
+        if self.policyID == "081059":
+            s = np.delete(s, np.r_[52:69, 73:78]) #ibrido - 0810559
+        elif self.policyID == "131519":
+            s = np.delete(s, np.r_[35:69]) #vel - 0810559
+        elif self.policyID == "131330":
+            s = np.delete(s, np.r_[52:69, 73:82]) #cont - 0810559
+        #s = np.delete(s,np.r_[73:78])  
+        #s = np.delete(s, np.r_[52:69,73:78])
+        #s = np.delete(s, np.r_[52:69,73:82])
 
         # preprocessor = joblib.load("models/201438/preprocessor.joblib")
 
@@ -184,6 +194,7 @@ class TrainedControllerPDSEQ(BiConMPC):
         self.device = device
         self.seq_length = 3
         self.state_history = deque(maxlen=self.seq_length)
+        self . ID = "SEQ"
         
         # Load the entire model
         self.policy = torch.load(datasetPath, map_location=device)
@@ -203,11 +214,12 @@ class TrainedControllerPDSEQ(BiConMPC):
         super().get_torques(q, v, robot_data)
         import numpy as np
         import torch
-        # import joblib
+        #import joblib
+        
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         s = np.concatenate((q[2:], v))  # Example combination of state variables
         
-        cnt_base = detectContact.detect_contact_steps3(self.gait_gen.cnt_plan,q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
+        cnt_base = detectContact.detect_contact_steps4(self.gait_gen.cnt_plan,q) # #17:[4x4],1 _ [[bool1,x1,y1,z1],[bool2,x2,y2,z2],[bool3,x3,y3,z3],[bool4,x4,y4,z4],timesteps]
         s = np.append(s, cnt_base[0].flatten()) # actual next contact
         s = np.append(s, cnt_base[1]) # timesteps. Note: NOT expressed in seconds
         #len 52 
@@ -234,7 +246,7 @@ class TrainedControllerPDSEQ(BiConMPC):
         #len 83
       #  states = np.delete(states, [73,74,75,76,78], axis=1) #phase 0,1,2,3, gait index
         #s = np.delete(s,np.r_[73:78]) 
-        states = np.delete(states, np.r_[73:78])
+        s = np.delete(s, np.r_[73:78])
         self.state_history.append(s)
 
         # Check if we have enough states to form a sequence
