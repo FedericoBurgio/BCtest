@@ -214,7 +214,7 @@ def train_model(model, train_loader, val_loader, criterion, optimizer, scheduler
     return best_policy, train_losses, val_losses
 
 # Main script
-dataset_name = "1samples_5duration_ForcesTruePertFalsedet4_new.h5"  # Specify dataset name
+dataset_name = "1samples_5duration_ForcesTruePertTruedet4_999.h5"  # Specify dataset name
 states, qNext = load_data(dataset_name)
 save_dir = create_save_folder()
 
@@ -239,7 +239,10 @@ states = tuple(
     tuple(state[i] * 0.05 if i == 51 else state[i] for i in range(len(state)))
     for state in states
 )
-states = np.delete(states, np.r_[0,1], axis=1)
+
+#states = np.delete(states, np.r_[0,1], axis=1)
+#[52:69, 73:77, 78:82]
+states = np.delete(states, np.r_[52:69, 73:77, 78:82], axis=1)
 #states = np.delete(states, np.r_[52:69, 73:78], axis=1)
 #states = np.delete(states, np.r_[35:69], axis=1)
 

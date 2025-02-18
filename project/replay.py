@@ -87,6 +87,8 @@ datasetname = "060716"
 datasetname = "261754"
 datasetname = "111104"
 datasetname = "090816"
-datasetname = "201427"
 ep = "20"
-replay(datasetname, ep, [[0,0.3,0.,0],[0,0,0,0],[1,0.2,0.2,0]], 2.2)
+from compareConf import policy, ep, comb, sim_time 
+datasetname = policy
+    
+replay(datasetname, ep, comb, sim_time)

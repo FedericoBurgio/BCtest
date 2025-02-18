@@ -312,9 +312,10 @@ class Simulator(object):
                     (simulation_time < 0. or
                         self.sim_step * self.sim_dt < simulation_time)):
                     RTswitch()
+                    #if self.sim_step == 350: breakpoint()
                     randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
                     #print("Step: ", self.sim_step)
-                    #if self.sim_step == 100: breakpoint()
+                  #  if self.sim_step == 450: breakpoint()
                     self._simulation_step_with_timings(real_time)
                     self.update_visuals(viewer)
                     viewer.sync()
@@ -329,7 +330,6 @@ class Simulator(object):
             while (simulation_time < 0. or self.sim_step < simulation_time * (1 / self.sim_dt)):
                 if np.any(self.robot.data.xfrc_applied != 0):
                     self.robot.data.xfrc_applied = np.zeros_like(self.robot.data.xfrc_applied)   
-               
                 RTswitch()
                 randomForce(self.robot.data, self.timing, (self.f)*(1-fails/5))
                 self._simulation_step_with_timings(real_time)

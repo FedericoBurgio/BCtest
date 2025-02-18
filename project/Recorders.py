@@ -113,7 +113,10 @@ class DataRecorderNominal(object):
         
     def record(self, q: np.array, v: np.array, tau: np.array, robot_data: Any, **kwargs) -> None:
         self.s_list.append(q)
-        self.v_list.append(v)
+        
+        #print("q",q)
+       # print("s_list",self.s_list) 
+        self.v_list.append(v.copy())
         self.cnt_bools.append(self.controller_.gait_gen.cnt_plan[0].flatten()[::4])
         
         tmp = []

@@ -133,6 +133,10 @@ class TrainedControllerPD(BiConMPC):
             s = np.delete(s, np.r_[35:69]) #vel - 0810559
         elif self.policyID == "131330":
             s = np.delete(s, np.r_[52:69, 73:82]) #cont - 0810559
+        elif self.policyID == "101759" or self.policyID == "111351":
+            s = np.delete(s, np.r_[52:69, 73:77, 78:82]) #cont - 0810559
+        
+        
         #s = np.delete(s,np.r_[73:78])  
         #s = np.delete(s, np.r_[52:69,73:78])
         #s = np.delete(s, np.r_[52:69,73:82])
