@@ -49,13 +49,13 @@ def replay(dataset, ep, comb, sim_time):
         
 
 #from compareConf import policy, ep, comb, sim_time 
-#datasetname = policy
+#policy = policy
 
-datasetname = "081059" #081059: ibrido. 131519: vel. 131330: contact
+policy = "081059" #081059: ibrido. 131519: vel. 131330: contact
 ep = "final"
 multi = False #se True valuta le commanded una ad una - SETTARE TRUE PER FARE RECORDING PER HEATMAPS
 view = True
 comb = [[0,.3,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]
 sim_time = 3
  
-replay(datasetname, ep, comb, sim_time)
+replay(policy, ep, comb, sim_time)
