@@ -1,5 +1,5 @@
 # config.py
-policy = "all" #081059: ibrido. 131519: vel. 131330: contact
+policy = "081059" #081059: ibrido. 131519: vel. 131330: contact
 ep = "final"
 #1 2
 #comb = [[1, 0.5, 0.1, 0.0],[1, -0.1, 0.1, 0],[0, 0.3, 0, 0],[1, 0.3, -0.3, 0]] #seq1 2.2
@@ -141,5 +141,5 @@ sim_time = 10
 # sim_time = 1.1 + 5
 
 
-multi = True #se True valuta le commanded una ad una - SETTARE TRUE PER FARE RECORDING PER HEATMAPS
-view = False
+multi = False #se True valuta le commanded una ad una - SETTARE TRUE PER FARE RECORDING PER HEATMAPS
+view = True

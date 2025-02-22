@@ -34,6 +34,7 @@ def replay(dataset, ep, comb, sim_time):
     controller = Controllers.TrainedControllerPD(robot.pin, datasetPath = "/home/atari_ws/project/models/" + dataset + "/best_policy_ep" + ep + ".pth")#, state_size=NNprop['s_size'], action_size=NNprop['a_size'], hL=NNprop['h_layers'],
                                                     #replanning_time=0.05, sim_opt_lag=False,
                                                     #datasetPath = "/home/atari_ws/project/models/" + dataset + "/best_policy_ep" + ep + ".pth")
+    controller.policyID = dataset
     controller.gait_index = comb[0][0]
     simulator = Simulator(robot, controller)
     
@@ -46,49 +47,15 @@ def replay(dataset, ep, comb, sim_time):
         comb = comb
     )
         
-# datasetname = "151143" #full state
-# datasetname= "151216"  #senza states = np.delete(states, [73,74,75,76,77], axis=1)
-# datasetname = "151306" #BUONO3
 
-# datasetname = "160949" #BUONO3
+#from compareConf import policy, ep, comb, sim_time 
+#datasetname = policy
 
-# datasetname = "161519" 
-# datasetname = "161442" 
-
-# datasetname = "161523"
-# datasetname = "161539"
-
-# datasetname = "161539"
-# datasetname = "171411"
-
-# datasetname = "171520" #50 - 0.5
-# datasetname = "171557" #50 - 0.75
-# datasetname = "180902"
-
-# datasetname = "190904"
-
-datasetname = "191509"
-datasetname = "181955"
-
-datasetname = "230946"
-datasetname = "241544"
-
-datasetname = "241748"
-
-datasetname = "251153"
-datasetname = "241755"
-
-datasetname = "261004"
-datasetname = "260954"
-datasetname = "261122"
-datasetname = "261243"
-datasetname = "261643"
-datasetname = "060716"
-datasetname = "261754"
-datasetname = "111104"
-datasetname = "090816"
-ep = "20"
-from compareConf import policy, ep, comb, sim_time 
-datasetname = policy
-    
+datasetname = "081059" #081059: ibrido. 131519: vel. 131330: contact
+ep = "final"
+multi = False #se True valuta le commanded una ad una - SETTARE TRUE PER FARE RECORDING PER HEATMAPS
+view = True
+comb = [[0,.3,0,0],[0,1,0,0],[0,1,0,0],[0,1,0,0]]
+sim_time = 3
+ 
 replay(datasetname, ep, comb, sim_time)
